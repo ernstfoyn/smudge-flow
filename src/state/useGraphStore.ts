@@ -23,6 +23,8 @@ interface GraphState {
   selected: NodeId | null
   /** Markert utvalg (brukkes til å lage grupper). */
   selection: NodeId[]
+  /** Markerte koblinger (kan slettes med Delete). */
+  selectedEdges: string[]
   /** Kort melding om siste kobling (feil eller info). */
   notice: string | null
 
@@ -52,6 +54,8 @@ interface GraphState {
   unexposeInput: (groupId: NodeId, inputId: string) => void
   /** Fjerner en eksponert utgang. */
   unexposeOutput: (groupId: NodeId, outputId: string) => void
+  /** Koble fra en intern kobling i en gruppe. */
+  disconnectGroupEdge: (groupId: NodeId, edgeId: string) => void
   /** Setter en blokk fra biblioteket inn i grafen. */
   insertBlock: (template: BlockTemplate, position?: { x: number; y: number }) => NodeId | null
   /** Lagrer markerte noder som en blokk i biblioteket. */
@@ -66,16 +70,42 @@ interface GraphState {
   setSettings: (patch: Partial<GraphSettings>) => void
   select: (id: NodeId | null) => void
   setSelection: (ids: NodeId[]) => void
+  /** Legger til/fjerner en node i markeringen (multi-selektering). */
+  updateSelection: (id: NodeId, selected: boolean) => void
+  setSelectedEdges: (ids: string[]) => void
   reset: () => void
 }
 
 let counter = 0
 const nextId = (type: string) => `${type}-${Date.now().toString(36)}-${counter++}`
 
+/**
+ * Fjerner en node (med sine kant) inne i en gruppe.
+ * Rekursivt, slik at grupper inne i grupper også håndteres.
+ */
+function removeFromSubgraph(node: GraphNode, id: NodeId): GraphNode {
+  if (!node.group) return node
+  const group = structuredClone(node.group)
+
+  const contained = group.nodes.some((n) => n.id === id)
+  if (contained) {
+    group.nodes = group.nodes.filter((n) => n.id !== id)
+    group.edges = group.edges.filter((e) => e.source !== id && e.target !== id)
+    // Eksponerte porter som peker på den slettede noden, fjernes også.
+    group.inputs = group.inputs.filter((i) => i.targetNode !== id)
+    group.outputs = group.outputs.filter((o) => o.sourceNode !== id)
+  } else {
+    group.nodes = group.nodes.map((n) => removeFromSubgraph(n, id))
+  }
+
+  return { ...node, group }
+}
+
 export const useGraphStore = create<GraphState>((set, get) => ({
   graph: defaultGraph(),
   selected: null,
   selection: [],
+  selectedEdges: [],
   notice: null,
 
   setGraph: (graph) => set({ graph }),
@@ -88,14 +118,22 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     return id
   },
 
+  /**
+   * Fjerner en node — også noder som ligger inne i en gruppe.
+   *
+   * Kantene til noden fjernes alltid, uansett hvor den ligger.
+   */
   removeNode: (id) =>
     set((s) => ({
       graph: {
         ...s.graph,
-        nodes: s.graph.nodes.filter((n) => n.id !== id),
+        nodes: s.graph.nodes
+          .filter((n) => n.id !== id)
+          .map((n) => (n.group ? removeFromSubgraph(n, id) : n)),
         edges: s.graph.edges.filter((e) => e.source !== id && e.target !== id),
       },
       selected: s.selected === id ? null : s.selected,
+      selection: s.selection.filter((x) => x !== id),
     })),
 
   moveNode: (id, position) =>
@@ -502,6 +540,21 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     return template
   },
 
+  /** Koble fra en intern kobling i en gruppe. */
+  disconnectGroupEdge: (groupId, edgeId) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) => {
+          if (n.id !== groupId || !n.group) return n
+          const group = structuredClone(n.group)
+          group.edges = group.edges.filter((e) => e.id !== edgeId)
+          return { ...n, group }
+        }),
+      },
+      notice: null,
+    })),
+
   setParam: (id, key, value) =>
     set((s) => ({
       graph: {
@@ -577,6 +630,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   select: (selected) => set({ selected, selection: selected ? [selected] : [] }),
 
   setSelection: (selection) => set({ selection, selected: selection[selection.length - 1] ?? null }),
+
+  updateSelection: (id, selected) =>
+    set((s) => {
+      const has = s.selection.includes(id)
+      if (selected && !has) return { selection: [...s.selection, id], selected: id }
+      if (!selected && has) {
+        const next = s.selection.filter((x) => x !== id)
+        return { selection: next, selected: next[next.length - 1] ?? null }
+      }
+      return {}
+    }),
+
+  setSelectedEdges: (selectedEdges) => set({ selectedEdges }),
 
   reset: () => set({ graph: defaultGraph(), selected: null }),
 }))

@@ -1,9 +1,21 @@
 import { registry } from '../../nodes'
-import { nodePorts } from '../../engine/graph'
+import type { Graph, GraphNode } from '../../engine/types'
+import { nodeParamDefs, nodePorts } from '../../engine/graph'
 import { useGraphStore } from '../../state/useGraphStore'
 import { usePlaybackStore } from '../../state/usePlaybackStore'
 import { ParamField } from '../primitives/Fields'
 import { WAVEFORMS } from '../../engine/animation/lfo'
+
+/** Tittel på en node, ut fra grafen. */
+function nodeTitle(graph: Graph, id: string): string {
+  return graph.nodes.find((n) => n.id === id)?.title ?? id
+}
+
+/** Etikett på en parameter. */
+function paramLabel(node: GraphNode, key?: string): string {
+  if (!key) return ''
+  return nodeParamDefs(node).find((p) => p.key === key)?.label ?? key
+}
 
 export function Inspector() {
   const graph = useGraphStore((s) => s.graph)
@@ -22,6 +34,7 @@ export function Inspector() {
   const exposeOutput = useGraphStore((s) => s.exposeOutput)
   const unexposeInput = useGraphStore((s) => s.unexposeInput)
   const unexposeOutput = useGraphStore((s) => s.unexposeOutput)
+  const disconnectGroupEdge = useGraphStore((s) => s.disconnectGroupEdge)
   const frame = usePlaybackStore((s) => s.frame)
 
   const node = graph.nodes.find((n) => n.id === selected)
@@ -40,6 +53,10 @@ export function Inspector() {
 
   /** Lagene som er koblet til en multiple-port, i tegnerrekkefølge. */
   const layerPorts = nodePorts(node).inputs.filter((p) => p.multiple)
+
+  /** Alle koblinger inn og ut av noden. */
+  const incoming = graph.edges.filter((e) => e.target === node.id)
+  const outgoing = graph.edges.filter((e) => e.source === node.id)
 
   if (isGroup) {
     return (
@@ -131,6 +148,38 @@ export function Inspector() {
             <p className="text-[11px] text-zinc-600">Ingen eksponerte utganger.</p>
           )}
         </section>
+
+        {node.group && node.group.edges.length > 0 && (
+          <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
+            <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+              Interne koblinger
+            </h3>
+            <ul className="flex flex-col gap-1">
+              {node.group.edges.map((edge) => {
+                const from = node.group?.nodes.find((n) => n.id === edge.source)?.title ?? edge.source
+                const to = node.group?.nodes.find((n) => n.id === edge.target)?.title ?? edge.target
+                return (
+                  <li
+                    key={edge.id}
+                    className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px]"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-zinc-400">
+                      {from} → {to}
+                    </span>
+                    <button
+                      type="button"
+                      title="Koble fra"
+                      onClick={() => disconnectGroupEdge(node.id, edge.id)}
+                      className="shrink-0 rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
 
         <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
           <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
@@ -314,6 +363,63 @@ export function Inspector() {
 
       {params.length === 0 && (
         <p className="text-[11px] text-zinc-500">Denne noden har ingen parametere.</p>
+      )}
+
+      {/* Koblinger: en synlig måte å koble fra, uten å være avhengig av Delete-tasten. */}
+      {incoming.length + outgoing.length > 0 && (
+        <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
+          <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+            Koblinger
+          </h3>
+          <ul className="flex flex-col gap-1">
+            {incoming.map((edge) => (
+              <li
+                key={edge.id}
+                className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px]"
+              >
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500" />
+                <span className="min-w-0 flex-1 truncate text-zinc-300">
+                  fra <span className="text-zinc-400">{nodeTitle(graph, edge.source)}</span>
+                  {edge.kind === 'param' && (
+                    <span className="ml-1 text-[10px] text-fuchsia-300">
+                      → {paramLabel(node, edge.targetParam)} (parameter)
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  title="Koble fra"
+                  onClick={() => disconnect(edge.id)}
+                  className="shrink-0 rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+            {outgoing.map((edge) => (
+              <li
+                key={edge.id}
+                className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px]"
+              >
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-lime-400" />
+                <span className="min-w-0 flex-1 truncate text-zinc-300">
+                  til <span className="text-zinc-400">{nodeTitle(graph, edge.target)}</span>
+                </span>
+                <button
+                  type="button"
+                  title="Koble fra"
+                  onClick={() => disconnect(edge.id)}
+                  className="shrink-0 rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+            Du kan også merke en kobling i grafen og trykke Delete.
+          </p>
+        </section>
       )}
 
       {params.map((p) => {

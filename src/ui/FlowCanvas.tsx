@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import {
   ReactFlow,
   Background,
@@ -8,6 +8,7 @@ import {
   useReactFlow,
   type Connection,
   type Edge,
+  type EdgeChange,
   type Node,
   type NodeChange,
 } from '@xyflow/react'
@@ -19,13 +20,17 @@ const nodeTypes = { card: NodeCard }
 
 function FlowInner() {
   const graph = useGraphStore((s) => s.graph)
+  const selection = useGraphStore((s) => s.selection)
+  const selectedEdges = useGraphStore((s) => s.selectedEdges)
   const moveNode = useGraphStore((s) => s.moveNode)
   const connect = useGraphStore((s) => s.connect)
   const addNode = useGraphStore((s) => s.addNode)
-  const setSelection = useGraphStore((s) => s.setSelection)
+  const updateSelection = useGraphStore((s) => s.updateSelection)
+  const removeNode = useGraphStore((s) => s.removeNode)
+  const disconnect = useGraphStore((s) => s.disconnect)
+  const setSelectedEdges = useGraphStore((s) => s.setSelectedEdges)
   const groupSelection = useGraphStore((s) => s.groupSelection)
   const saveSelectionAsBlock = useGraphStore((s) => s.saveSelectionAsBlock)
-  const selection = useGraphStore((s) => s.selection)
   const reactFlow = useReactFlow()
 
   const nodes: Node[] = useMemo(
@@ -35,8 +40,9 @@ function FlowInner() {
         type: 'card',
         position: n.position,
         data: {},
+        selected: selection.includes(n.id),
       })),
-    [graph.nodes],
+    [graph.nodes, selection],
   )
 
   const edges: Edge[] = useMemo(
@@ -47,9 +53,15 @@ function FlowInner() {
         sourceHandle: e.sourcePort,
         target: e.target,
         targetHandle: e.targetPort,
-        style: { stroke: '#a3e635', strokeWidth: 1.6 },
+        selected: selectedEdges.includes(e.id),
+        animated: e.kind === 'param',
+        style: {
+          stroke: e.kind === 'param' ? '#c084fc' : '#a3e635',
+          strokeWidth: e.kind === 'param' ? 1.4 : 1.6,
+          strokeDasharray: e.kind === 'param' ? '4 3' : undefined,
+        },
       })),
-    [graph.edges],
+    [graph.edges, selectedEdges],
   )
 
   const onNodesChange = useCallback(
@@ -57,10 +69,34 @@ function FlowInner() {
       for (const change of changes) {
         if (change.type === 'position' && change.position) {
           moveNode(change.id, change.position)
+          continue
+        }
+        if (change.type === 'select') {
+          // React Flow holder styringen; vi speiler markeringen i butikken.
+          updateSelection(change.id, change.selected)
+          continue
+        }
+        if (change.type === 'remove') {
+          removeNode(change.id)
         }
       }
     },
-    [moveNode],
+    [moveNode, removeNode, updateSelection],
+  )
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      for (const change of changes) {
+        if (change.type === 'select') {
+          setSelectedEdges(change.selected ? [change.id] : [])
+          continue
+        }
+        if (change.type === 'remove') {
+          disconnect(change.id)
+        }
+      }
+    },
+    [disconnect, setSelectedEdges],
   )
 
   const onConnect = useCallback(
@@ -76,13 +112,6 @@ function FlowInner() {
     [connect],
   )
 
-  const onSelectionChange = useCallback(
-    ({ nodes: selectedNodes }: { nodes: Node[] }) => {
-      setSelection(selectedNodes.map((n) => n.id))
-    },
-    [setSelection],
-  )
-
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault()
@@ -94,6 +123,38 @@ function FlowInner() {
     [addNode, reactFlow],
   )
 
+  /**
+   * Delete/Backspace sletter det som er merket.
+   *
+   * Vi håndterer dette selv i stedet for å la React Flow gjøre det, fordi
+   * grafen er kontrollert: da slipper vi å være avhengig av React Flows
+   * interne merkingslogikk, og både noder og koblinger kan slettes.
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return
+
+      // Ikke når brukeren skriver i et felt.
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
+
+      const state = useGraphStore.getState()
+      const nodeIds = state.selection
+      const edgeIds = state.selectedEdges
+      if (!nodeIds.length && !edgeIds.length) return
+
+      event.preventDefault()
+      for (const id of edgeIds) state.disconnect(id)
+      for (const id of nodeIds) state.removeNode(id)
+      state.setSelection([])
+      state.setSelectedEdges([])
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   return (
     <div className="h-full w-full" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
       <ReactFlow
@@ -101,8 +162,9 @@ function FlowInner() {
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
-        onSelectionChange={onSelectionChange}
+        onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        deleteKeyCode={null}
         multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
         fitView
         proOptions={{ hideAttribution: true }}
@@ -150,7 +212,7 @@ function FlowInner() {
       )}
 
       <span className="pointer-events-none absolute bottom-2 left-2 text-[10px] text-zinc-600">
-        Dra noder fra paletten hitte · Shift-klikk for å merke flere · lille håndtak styrer parametere
+        Dra noder fra paletten hitte · Shift-klikk for å merke flere · Delete fjerner valgte noder og koblinger
       </span>
     </div>
   )
