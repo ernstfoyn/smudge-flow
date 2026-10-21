@@ -126,6 +126,35 @@ Algoritmer: sine, trekant, sag, firkant og løkkesikker støy. Vindu
 
 ---
 
+## Blokk-bibliotek
+
+Fanen **Blokker** inneholder ferdige oppsett og blokkene du selv har lagret.
+
+**Innebygde oppsett:** Generativ bakgrunn, Raster-behandling, 3D-form,
+Loop-animert forvrengning, Lagstabel.
+
+**Slik lagrer du et nodetre for gjenbruk:**
+
+1. Marker nodene i grafen (Shift-klikk) → trykk **«⬚ Lag blokk»**.
+2. Gi blokken et navn. Den legges i biblioteket med én gang.
+3. **«Last inn»** setter blokken inn i grafen igjen — med egne interne noder,
+   så den er en selvstendig instans.
+4. Koble nytt innhold inn i inngangshåndtakene. Samme behandling, nytt innhold.
+
+Når du lagrer en blokk, skjer to ting automatisk:
+
+- **Innholdskildene holdes utenfor.** Hvis markeringen ikke har noen kryssende
+  kant inn i seg, blir nodene uten egne innganger (gradient, bilde, 3D-form)
+  holdt utenfor blokken og eksponert som inngang. Det er nettopp det som
+  gjør at blokken kan brukes på nytt innhold.
+- **Bladnodens utgang eksponeres.** En node som ikke fører videre, er et
+  resultat.
+
+Blokker lagres i nettleseren (localStorage) og kan eksporteres/importeres som
+JSON-filer for å dele dem mellom prosjekter.
+
+---
+
 ## 2D og 3D i samme graf
 
 3D-noden kjøres gjennom geometri, ikke piksler:

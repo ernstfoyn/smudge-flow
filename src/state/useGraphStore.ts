@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Graph, GraphSettings, Keyframe, LfoConfig, NodeId } from '../engine/types'
+import type { Graph, GraphNode, GraphSettings, Keyframe, LfoConfig, NodeId } from '../engine/types'
 import {
   PARAM_PORT_PREFIX,
   canConnectTypes,
@@ -13,6 +13,9 @@ import {
 import { wouldCreateCycle } from '../engine/topoSort'
 import { upsertKey } from '../engine/animation/keyframes'
 import { registry } from '../nodes'
+import { blockFromSelection } from '../blocks/builder'
+import { useLibraryStore } from './useLibraryStore'
+import type { BlockTemplate } from '../blocks/types'
 import { defaultGraph, makeNode } from './defaultGraph'
 
 interface GraphState {
@@ -49,6 +52,10 @@ interface GraphState {
   unexposeInput: (groupId: NodeId, inputId: string) => void
   /** Fjerner en eksponert utgang. */
   unexposeOutput: (groupId: NodeId, outputId: string) => void
+  /** Setter en blokk fra biblioteket inn i grafen. */
+  insertBlock: (template: BlockTemplate, position?: { x: number; y: number }) => NodeId | null
+  /** Lagrer markerte noder som en blokk i biblioteket. */
+  saveSelectionAsBlock: (name: string, description?: string) => BlockTemplate | null
 
   setParam: (id: NodeId, key: string, value: unknown) => void
   resetParams: (id: NodeId) => void
@@ -410,6 +417,90 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       },
       notice: null,
     })),
+
+  /**
+   * Setter en blokk fra biblioteket inn i grafen.
+   *
+   * Blokken blir en gruppe-node med egne interne node-ID-er, slik at den
+   * er en selvstendig instans. Eksponerte innganger blir håndtak du kan
+   * koble nytt innhold til.
+   */
+  insertBlock: (template, position) => {
+    const { graph } = get()
+    const groupId = nextId('block')
+    const group = rekeySubgraph(
+      {
+        nodes: template.nodes,
+        edges: template.edges,
+        inputs: template.inputs,
+        outputs: template.outputs,
+      },
+      groupId,
+    )
+
+    const node: GraphNode = {
+      id: groupId,
+      type: 'group',
+      title: template.name,
+      params: {},
+      tracks: {},
+      lfo: {},
+      position: position ?? { x: 120, y: 120 },
+      enabled: true,
+      group,
+    }
+
+    set({
+      graph: { ...graph, nodes: [...graph.nodes, node] },
+      selected: groupId,
+      selection: [groupId],
+      notice: `Satte inn «${template.name}». Koble til eget innhold på inngangene.`,
+    })
+    return groupId
+  },
+
+  /**
+   * Lagrer markerte noder som en blokk i biblioteket.
+   *
+   * Markeringen blir samtidig erstattet av en gruppe-node i grafen, slik
+   * at du kan koble nye kilder inn i de eksponerte inngangene med én gang.
+   */
+  saveSelectionAsBlock: (name, description) => {
+    const { graph, selection } = get()
+    const picked = selection.filter((id) => graph.nodes.some((n) => n.id === id))
+    if (!picked.length) {
+      set({ notice: 'Merk nodene du vil lagre som en blokk.' })
+      return null
+    }
+
+    const groupId = nextId('block')
+    const { groupNode, remaining, template } = blockFromSelection(
+      graph.nodes,
+      graph.edges,
+      picked,
+      name,
+      description,
+    )
+    const node = { ...groupNode, id: groupId, title: name }
+    const edges = remaining
+
+    set({
+      graph: {
+        ...graph,
+        nodes: [...graph.nodes.filter((n) => !picked.includes(n.id)), node],
+        edges,
+      },
+      selected: groupId,
+      selection: [groupId],
+      notice: `Lagret «${name}» i biblioteket.`,
+    })
+
+    // Blokken legges i biblioteket med én gang, slik at den kan brukes
+    // på nytt innhold senere.
+    useLibraryStore.getState().addBlock(template)
+
+    return template
+  },
 
   setParam: (id, key, value) =>
     set((s) => ({

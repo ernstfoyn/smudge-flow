@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FlowCanvas } from './ui/FlowCanvas'
 import { Viewport } from './ui/Viewport'
 import { NodePalette } from './ui/panels/NodePalette'
+import { BlockLibrary } from './ui/panels/BlockLibrary'
 import { Inspector } from './ui/panels/Inspector'
 import { Timeline } from './ui/panels/Timeline'
 import { ExportPanel } from './ui/panels/ExportPanel'
@@ -9,7 +10,7 @@ import { useGraphStore } from './state/useGraphStore'
 import { usePlaybackStore } from './state/usePlaybackStore'
 import { serializeGraph, deserializeGraph } from './engine/graph'
 
-type LeftTab = 'palette' | 'inspector'
+type LeftTab = 'palette' | 'inspector' | 'blocks'
 type BottomTab = 'timeline' | 'export'
 
 export default function App() {
@@ -112,6 +113,7 @@ export default function App() {
               [
                 ['palette', 'Noder'],
                 ['inspector', 'Egenskaper'],
+                ['blocks', 'Blokker'],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -129,7 +131,9 @@ export default function App() {
             ))}
           </nav>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {leftTab === 'palette' ? <NodePalette /> : <Inspector />}
+            {leftTab === 'palette' && <NodePalette />}
+            {leftTab === 'inspector' && <Inspector />}
+            {leftTab === 'blocks' && <BlockLibrary />}
           </div>
         </aside>
 

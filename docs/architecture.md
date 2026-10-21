@@ -111,6 +111,39 @@ Motoren støtter grupper rekursivt: `evaluateScope()` kalles på nytt for
 subgrafen, med verdiene for de eksponerte inngangene injisert. En gruppe kan
 derfor inneholde grupper.
 
+### Blokk-bibliotek
+
+En *blokk* er en gjenbrukbart nodetre som lever utenfor grafen. Teknisk er
+den en gruppe-node som er lagret som data:
+
+```ts
+interface BlockTemplate {
+  id, name, description?, category?
+  version: number
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  inputs: GroupInput[]
+  outputs: GroupOutput[]
+  builtin?: boolean
+}
+```
+
+Når en blokk settes inn, blir den en gruppe-node med `rekeySubgraph()` — egne
+interne node-ID-er, slik at den er en selvstendig instans.
+
+To automatiske grep gjør at en blokk faktisk er brukbar:
+
+| Grep | Hvorfor |
+|---|---|
+| Innholdskildene holdes utenfor | Ellers blir blokken lukket, og du kan ikke bytte innhold |
+| Bladnodens utgang eksponeres | Ellers kommer resultatet ingen vei |
+
+`withDefaultSources()` legger et synlig standardinnhold i hver eksponert
+inngang uten intern kilde. Da virker blokken med én gang, og en ekstern kilde
+kan overstyre standarden.
+
+Blokker lagres i `localStorage` og kan eksporteres/importeres som JSON.
+
 ---
 
 ## 4. Automatisert looping

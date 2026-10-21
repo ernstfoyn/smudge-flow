@@ -24,6 +24,7 @@ function FlowInner() {
   const addNode = useGraphStore((s) => s.addNode)
   const setSelection = useGraphStore((s) => s.setSelection)
   const groupSelection = useGraphStore((s) => s.groupSelection)
+  const saveSelectionAsBlock = useGraphStore((s) => s.saveSelectionAsBlock)
   const selection = useGraphStore((s) => s.selection)
   const reactFlow = useReactFlow()
 
@@ -122,14 +123,30 @@ function FlowInner() {
         />
       </ReactFlow>
 
-      {selection.length > 1 && (
-        <button
-          type="button"
-          onClick={() => groupSelection()}
-          className="absolute left-3 top-3 rounded-lg border border-violet-500/50 bg-violet-500/15 px-3 py-1.5 text-[11px] font-medium text-violet-100 backdrop-blur transition hover:bg-violet-500/25"
-        >
-          ⬚ Lag gruppe ({selection.length} noder)
-        </button>
+      {selection.length > 0 && (
+        <div className="absolute left-3 top-3 flex items-center gap-2">
+          {selection.length > 1 && (
+            <button
+              type="button"
+              onClick={() => groupSelection()}
+              className="rounded-lg border border-violet-500/50 bg-violet-500/15 px-3 py-1.5 text-[11px] font-medium text-violet-100 backdrop-blur transition hover:bg-violet-500/25"
+            >
+              ⬚ Lag gruppe ({selection.length})
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              const name = window.prompt('Navn på blokken', 'Min blokk')
+              if (!name) return
+              const description = window.prompt('Kort beskrivelse (valgfritt)', '') ?? undefined
+              saveSelectionAsBlock(name, description)
+            }}
+            className="rounded-lg border border-lime-500/50 bg-lime-500/15 px-3 py-1.5 text-[11px] font-medium text-lime-100 backdrop-blur transition hover:bg-lime-500/25"
+          >
+            ⬚ Lag blokk ({selection.length})
+          </button>
+        </div>
       )}
 
       <span className="pointer-events-none absolute bottom-2 left-2 text-[10px] text-zinc-600">

@@ -267,6 +267,25 @@ export function createGroupFromSelection(
     outputs.push(groupOutput)
   }
 
+  // En node som ikke fører videre inni gruppen, er et resultat.
+  // Eksponerer vi utgangen automatisk, ellers blir gruppen umulig å bruke.
+  for (const node of innerNodes) {
+    const feedsSomething = innerEdges.some((e) => e.source === node.id)
+    if (feedsSomething) continue
+
+    for (const port of nodePorts(node, resolver).outputs) {
+      if (outputs.some((o) => o.sourceNode === node.id && o.sourcePort === port.id)) continue
+      const groupOutput: GroupOutput = {
+        id: `out-${outputs.length}`,
+        name: port.label,
+        type: port.type,
+        sourceNode: node.id,
+        sourcePort: port.id,
+      }
+      outputs.push(groupOutput)
+    }
+  }
+
   const position = {
     x: innerNodes.reduce((sum, n) => sum + n.position.x, 0) / Math.max(1, innerNodes.length),
     y: innerNodes.reduce((sum, n) => sum + n.position.y, 0) / Math.max(1, innerNodes.length),
