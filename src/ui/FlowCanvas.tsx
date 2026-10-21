@@ -103,7 +103,10 @@ function FlowInner() {
           zoomable
           className="!border-zinc-700 !bg-zinc-900"
           style={{ width: 170, height: 120 }}
-          nodeColor={() => '#3f6212'}
+          maskColor="rgba(9, 9, 11, 0.72)"
+          nodeColor={() => '#4d7c0f'}
+          nodeStrokeColor="#a3e635"
+          nodeBorderRadius={3}
         />
       </ReactFlow>
       <span className="pointer-events-none absolute bottom-2 left-2 text-[10px] text-zinc-600">

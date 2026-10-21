@@ -50,6 +50,20 @@ body {
   border-radius: 0.75rem;
 }
 
+.react-flow__controls-button {
+  background: #18181b;
+  border-bottom: 1px solid #3f3f46;
+  fill: #a1a1aa;
+}
+
+.react-flow__controls-button:hover {
+  background: #27272a;
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
 /* Scrollbars */
 * {
   scrollbar-width: thin;
