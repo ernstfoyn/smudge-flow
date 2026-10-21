@@ -9,6 +9,8 @@ import { defaultGraph, makeNode } from './defaultGraph'
 interface GraphState {
   graph: Graph
   selected: NodeId | null
+  /** Kort melding om siste kobling (feil eller info). */
+  notice: string | null
 
   setGraph: (graph: Graph) => void
   addNode: (type: string, position: { x: number; y: number }) => NodeId | null
@@ -19,6 +21,8 @@ interface GraphState {
 
   connect: (source: NodeId, sourcePort: string, target: NodeId, targetPort: string) => boolean
   disconnect: (edgeId: string) => void
+  reorderInput: (nodeId: NodeId, portId: string, from: number, to: number) => void
+  clearNotice: () => void
 
   setParam: (id: NodeId, key: string, value: unknown) => void
   resetParams: (id: NodeId) => void
@@ -37,6 +41,7 @@ const nextId = (type: string) => `${type}-${Date.now().toString(36)}-${counter++
 export const useGraphStore = create<GraphState>((set, get) => ({
   graph: defaultGraph(),
   selected: null,
+  notice: null,
 
   setGraph: (graph) => set({ graph }),
 
@@ -87,7 +92,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   connect: (source, sourcePort, target, targetPort) => {
     const { graph } = get()
     if (source === target) return false
-    if (wouldCreateCycle(graph, source, target)) return false
+    if (wouldCreateCycle(graph, source, target)) {
+      set({ notice: 'Koblingen ble avvist — den ville skapt en syklus i grafen.' })
+      return false
+    }
 
     const sourceDef = registry.get(graph.nodes.find((n) => n.id === source)?.type ?? '')
     const targetDef = registry.get(graph.nodes.find((n) => n.id === target)?.type ?? '')
@@ -95,26 +103,72 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const outPort = findPort(sourceDef.outputs, sourcePort)
     const inPort = findPort(targetDef.inputs, targetPort)
     if (!outPort || !inPort) return false
-    if (!canConnectTypes(outPort.type, inPort.type)) return false
+    if (!canConnectTypes(outPort.type, inPort.type)) {
+      set({ notice: `Kan ikke koble ${outPort.type} til ${inPort.type}.` })
+      return false
+    }
 
     const id = `${source}.${sourcePort}->${target}.${targetPort}`
+    const existing = graph.edges.filter((e) => e.target === target && e.targetPort === targetPort)
+
+    if (inPort.multiple) {
+      // Flere lag tillatt: behold alle, den nye legges på toppen.
+      if (existing.some((e) => e.id === id)) {
+        set({ notice: 'Denne forbindelsen finnes allerede.' })
+        return false
+      }
+      set({
+        graph: { ...graph, edges: [...graph.edges, { id, source, sourcePort, target, targetPort }] },
+        notice: null,
+      })
+      return true
+    }
+
+    // Én inngang per port: en ny kant erstatter den gamle.
     set({
       graph: {
         ...graph,
-        // Én inngang per port: en ny kant erstatter den gamle.
         edges: [
           ...graph.edges.filter((e) => !(e.target === target && e.targetPort === targetPort)),
           { id, source, sourcePort, target, targetPort },
         ],
       },
+      notice: existing.length
+        ? `«${inPort.label}» var allerede koblet — den gamle forbindelsen ble erstattet. Bruk en lagstabel for å kombinere flere lag.`
+        : null,
     })
     return true
   },
 
+  /**
+   * Endrer rekkefølgen på lagene som er koblet til en multiple-port.
+   * Lagene tegnes i kantrekkefølge, så dette bestemmer hva som ligger øverst.
+   */
+  reorderInput: (nodeId, portId, from, to) =>
+    set((s) => {
+      const matching = s.graph.edges.filter((e) => e.target === nodeId && e.targetPort === portId)
+      if (from < 0 || from >= matching.length || to < 0 || to >= matching.length) return s
+
+      const reordered = [...matching]
+      const [moved] = reordered.splice(from, 1)
+      reordered.splice(to, 0, moved)
+
+      let cursor = 0
+      const edges = s.graph.edges.map((e) => {
+        if (e.target === nodeId && e.targetPort === portId) return reordered[cursor++]
+        return e
+      })
+
+      return { graph: { ...s.graph, edges } }
+    }),
+
   disconnect: (edgeId) =>
     set((s) => ({
       graph: { ...s.graph, edges: s.graph.edges.filter((e) => e.id !== edgeId) },
+      notice: null,
     })),
+
+  clearNotice: () => set({ notice: null }),
 
   setParam: (id, key, value) =>
     set((s) => ({

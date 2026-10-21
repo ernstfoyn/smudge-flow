@@ -36,9 +36,15 @@ export function NodePalette() {
                   onDragStart={(e) => e.dataTransfer.setData('application/smudge-node', def.type)}
                   onClick={() => addNode(def.type, { x: 120 + Math.random() * 160, y: 120 + Math.random() * 160 })}
                   className="rounded-lg border border-zinc-800 bg-zinc-900/70 px-2.5 py-1.5 text-left text-[12px] text-zinc-200 transition hover:border-lime-500/60 hover:bg-zinc-800"
+                  title={def.description}
                 >
                   {def.label}
                   <span className="ml-2 text-[10px] text-zinc-600">{def.type}</span>
+                  {def.description && (
+                    <span className="mt-0.5 block text-[10px] leading-snug text-zinc-600">
+                      {def.description}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

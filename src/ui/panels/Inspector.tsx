@@ -13,6 +13,8 @@ export function Inspector() {
   const toggleNode = useGraphStore((s) => s.toggleNode)
   const setLfo = useGraphStore((s) => s.setLfo)
   const setKeyframe = useGraphStore((s) => s.setKeyframe)
+  const reorderInput = useGraphStore((s) => s.reorderInput)
+  const disconnect = useGraphStore((s) => s.disconnect)
   const frame = usePlaybackStore((s) => s.frame)
 
   const node = graph.nodes.find((n) => n.id === selected)
@@ -26,6 +28,9 @@ export function Inspector() {
   }
 
   const def = registry.get(node.type)
+
+  /** Lagene som er koblet til en multiple-port, i tegnerrekkefølge. */
+  const layerPorts = def.inputs.filter((p) => p.multiple)
 
   return (
     <div className="flex flex-col gap-4 p-3">
@@ -51,6 +56,74 @@ export function Inspector() {
           </button>
         </div>
       </header>
+
+      {def.description && (
+        <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-2 text-[11px] leading-relaxed text-zinc-400">
+          {def.description}
+        </p>
+      )}
+
+      {layerPorts.map((port) => {
+        const edges = graph.edges.filter((e) => e.target === node.id && e.targetPort === port.id)
+        return (
+          <section key={port.id} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
+            <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+              {port.label} · {edges.length} lag
+            </h3>
+
+            {edges.length === 0 && (
+              <p className="text-[11px] text-zinc-600">Ingen lag koblet ennå.</p>
+            )}
+
+            <ol className="flex flex-col gap-1">
+              {edges.map((edge, index) => {
+                const source = graph.nodes.find((n) => n.id === edge.source)
+                return (
+                  <li
+                    key={edge.id}
+                    className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1"
+                  >
+                    <span className="w-4 text-[10px] tabular-nums text-zinc-600">{index + 1}</span>
+                    <span className="flex-1 truncate text-[11px] text-zinc-300">
+                      {source?.title ?? edge.source}
+                    </span>
+                    <button
+                      type="button"
+                      title="Flytt opp"
+                      disabled={index === 0}
+                      onClick={() => reorderInput(node.id, port.id, index, index - 1)}
+                      className="rounded px-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-25"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      title="Flytt ned"
+                      disabled={index === edges.length - 1}
+                      onClick={() => reorderInput(node.id, port.id, index, index + 1)}
+                      className="rounded px-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-25"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      title="Koble fra"
+                      onClick={() => disconnect(edge.id)}
+                      className="rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                )
+              })}
+            </ol>
+
+            <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+              Lag 1 er bunnen. Resten blandes oppå med modus og dekkevne under.
+            </p>
+          </section>
+        )
+      })}
 
       {def.params.length === 0 && (
         <p className="text-[11px] text-zinc-500">Denne noden har ingen parametere.</p>

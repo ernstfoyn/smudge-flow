@@ -68,8 +68,20 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `modifier.pixelate` | modifikator | Orbit `image-effects.js` |
 | `modifier.warp` | modifikator | Orbit `image-effects.js` |
 | `composite.blend` | kompositt | Smudge `BlendStage.jsx` (8 blendemodeller) |
+| `composite.stack` | kompositt | Ny — kombinerer N lag i én node |
 | `output.viewport` | output | Ny — merker leveransen for preview |
 | `output.export` | output | Ny — merker leveransen for MP4 |
+
+### Kombinere flere lag
+
+`composite.blend` har to innganger: **Bunn** og **Topp**. For flere lag bruker
+du **Lagstabel** (`composite.stack`): koble så mange kilder du vil inn i samme
+port «Lag». Lag 1 er bunnen, resten blandes oppå med valgt modus og dekkevne.
+Rekkefølgen kan endres i inspectoren (↑/↓ per lag).
+
+> Merk: en inngangsport på en vanlig node holder **én** kobling. Koble du en
+> tredje kilde inn i «Bunn», erstattes den gamle forbindelsen — appen varsler
+> om dette og peker på lagstabelen.
 
 ---
 

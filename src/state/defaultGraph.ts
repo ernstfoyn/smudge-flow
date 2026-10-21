@@ -32,16 +32,17 @@ export function defaultGraph(): Graph {
     colorB: '#4bdac5',
   }
 
-  const blendNode = makeNode('composite.blend', 'blend-1', { x: 420, y: 160 })
-  blendNode.params = { ...blendNode.params, mode: 'screen', opacity: 0.9 }
+  const stackNode = makeNode('composite.stack', 'stack-1', { x: 420, y: 160 })
+  stackNode.params = { ...stackNode.params, mode: 'screen', opacity: 0.9 }
 
   const out = makeNode('output.viewport', 'out-1', { x: 720, y: 160 })
 
-  graph.nodes = [gradient, motion, blendNode, out]
+  graph.nodes = [gradient, motion, stackNode, out]
   graph.edges = [
-    createEdge('gradient-1', 'out', 'blend-1', 'base'),
-    createEdge('motion-1', 'out', 'blend-1', 'top'),
-    createEdge('blend-1', 'out', 'out-1', 'frame'),
+    // Begge lagene inn i samme port — lagstabelen takler N lag.
+    createEdge('gradient-1', 'out', 'stack-1', 'in'),
+    createEdge('motion-1', 'out', 'stack-1', 'in'),
+    createEdge('stack-1', 'out', 'out-1', 'frame'),
   ]
 
   return graph

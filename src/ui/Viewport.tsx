@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGraphStore } from '../state/useGraphStore'
 import { usePlaybackStore } from '../state/usePlaybackStore'
 import { evaluator, renderServices } from '../state/studio'
@@ -14,6 +14,7 @@ export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const graph = useGraphStore((s) => s.graph)
   const frame = usePlaybackStore((s) => s.frame)
+  const [error, setError] = useState<string | null>(null)
 
   // Hold mutable tilstand utenfor React, slik at rAF-loopen ikke
   // trigger re-renders.
@@ -83,9 +84,12 @@ export function Viewport() {
         ctx.globalCompositeOperation = 'source-over'
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         if (source) ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
-      } catch (error) {
+        setError(null)
+      } catch (err) {
         if (alive) {
-          console.error('[viewport]', error)
+          const message = (err as Error)?.message ?? 'Ukjent feil under evaluering.'
+          setError(message)
+          console.error('[viewport]', err)
           state.current.dirty = true
         }
       }
@@ -108,6 +112,19 @@ export function Viewport() {
       >
         <canvas ref={canvasRef} className="block h-full w-full" />
       </div>
+
+      {error && (
+        <div className="absolute inset-x-4 top-16 rounded-lg border border-red-500/40 bg-red-950/80 p-3 text-[12px] leading-relaxed text-red-200 backdrop-blur">
+          <strong className="mb-1 block text-[11px] uppercase tracking-widest text-red-300">
+            Graffen kan ikke evalueres
+          </strong>
+          {error}
+          <p className="mt-1.5 text-[11px] text-red-300/70">
+            Nodekort med en rødd prikk mangler en påkrevd inngang.
+          </p>
+        </div>
+      )}
+
       <div className="pointer-events-none absolute left-4 top-4 flex gap-2 text-[10px]">
         <span className="rounded bg-black/60 px-2 py-1 tabular-nums text-lime-300">
           frame {frame}

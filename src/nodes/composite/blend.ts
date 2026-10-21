@@ -34,6 +34,8 @@ export const blend: NodeDefinition<BlendParams> = {
   type: 'composite.blend',
   label: 'Blanding',
   category: 'composite',
+  description:
+    'Blander to lag: «Bunn» tegnes først, «Topp» blandes oppå med blandemodus. For flere lag: bruk Lagstabel.',
   inputs: [
     { id: 'base', label: 'Bunn', type: 'canvas', optional: true },
     { id: 'top', label: 'Topp', type: 'canvas', optional: true },

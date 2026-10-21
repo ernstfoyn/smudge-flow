@@ -18,6 +18,8 @@ export default function App() {
   const graph = useGraphStore((s) => s.graph)
   const setGraph = useGraphStore((s) => s.setGraph)
   const reset = useGraphStore((s) => s.reset)
+  const notice = useGraphStore((s) => s.notice)
+  const clearNotice = useGraphStore((s) => s.clearNotice)
   const toggle = usePlaybackStore((s) => s.toggle)
   const isPlaying = usePlaybackStore((s) => s.isPlaying)
 
@@ -88,6 +90,19 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {notice && (
+        <div className="flex items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[12px] text-amber-200">
+          <span className="flex-1">{notice}</span>
+          <button
+            type="button"
+            onClick={clearNotice}
+            className="rounded border border-amber-500/40 px-2 py-0.5 text-[11px] hover:bg-amber-500/20"
+          >
+            Lukk
+          </button>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
         {/* Venstre: palett + inspector */}

@@ -6,6 +6,7 @@ import { transform2D } from './modifier/transform2D'
 import { raster } from './modifier/raster'
 import { blurNode, pixelateNode, warpNode } from './modifier/pixelNodes'
 import { blend } from './composite/blend'
+import { stack } from './composite/stack'
 import { exportOutput, viewport } from './output/outputs'
 
 /**
@@ -24,6 +25,7 @@ export const registry = new NodeRegistry().registerAll([
   warpNode,
   // Kompositt
   blend,
+  stack,
   // Output
   viewport,
   exportOutput,

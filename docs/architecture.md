@@ -90,6 +90,27 @@ Canvas gjenbrukes per node (`RenderServices.canvas(nodeId)`), slik at 60 fps i
 
 ## 2. Kontrakter
 
+### Flere lag inn i én node
+
+En inngangsport har som standard **én** kant — en ny kobling erstatter den gamle.
+Porten kan deklareres som `multiple: true`, og da får noden alle verdiene som
+et **array i kantrekkefølge**:
+
+```ts
+inputs: [{ id: 'in', label: 'Lag', type: 'canvas', multiple: true }]
+```
+
+```ts
+const list = (Array.isArray(layers) ? layers : [layers]) as CanvasImageSource[]
+```
+
+`composite.stack` bruker dette for å kombinere et ubegrenset antall lag i én
+node. Rekkefølgen bestemmer hva som ligger øverst, og kan endres i inspectoren
+(`reorderInput`).
+
+Erstatningen av en kant på en enkel port skjer ikke i det stille lenger: UI-en
+viser en melding som forklarer hva som skjedde og peker på lagstabelen.
+
 ### NodeDefinition
 
 ```ts

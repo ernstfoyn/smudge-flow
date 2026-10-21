@@ -41,6 +41,12 @@ export interface PortDef {
   label: string
   type: ValueType
   optional?: boolean
+  /**
+   * Porten kan ha flere innkoblinger.
+   * Da får noden en ARRAY med verdiene, i kantrekkefølge.
+   * (Eks: composite.stack — lagstabel med uendelig mange lag.)
+   */
+  multiple?: boolean
 }
 
 export type ParamType = 'number' | 'int' | 'boolean' | 'color' | 'enum' | 'text'
@@ -162,6 +168,8 @@ export interface NodeDefinition<P = Record<string, unknown>> {
   type: string
   label: string
   category: 'source' | 'modifier' | 'composite' | 'output'
+  /** Kort forklaring som vises i paletten og i noden. */
+  description?: string
   inputs: readonly PortDef[]
   outputs: readonly PortDef[]
   params: readonly ParamDef[]

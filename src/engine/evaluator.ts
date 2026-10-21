@@ -45,8 +45,15 @@ export class Evaluator {
     if (errors.length) throw new GraphError(errors.join('\n'))
 
     const byId = new Map(graph.nodes.map((n) => [n.id, n]))
-    const incoming = new Map<string, Graph['edges'][number]>()
-    for (const e of graph.edges) incoming.set(`${e.target}\u0000${e.targetPort}`, e)
+    // En inngangsport kan ha flere kanter (multiple: true).
+    // For enkle porter brukes den siste tilkoblede kantet.
+    const incoming = new Map<string, Graph['edges'][number][]>()
+    for (const e of graph.edges) {
+      const key = `${e.target}\u0000${e.targetPort}`
+      const list = incoming.get(key)
+      if (list) list.push(e)
+      else incoming.set(key, [e])
+    }
 
     const s = graph.settings
     const phase = frame / Math.max(1, s.frames)
@@ -61,7 +68,23 @@ export class Evaluator {
 
       const inputs: InputValues = {}
       for (const port of def.inputs) {
-        const edge = incoming.get(`${id}\u0000${port.id}`)
+        const edges = incoming.get(`${id}\u0000${port.id}`) ?? []
+
+        if (port.multiple) {
+          // Flere lag: verdiene kommer som en array i kantrekkefølge.
+          const values = edges
+            .map((edge) => outputs.get(edge.source)?.[edge.sourcePort])
+            .filter((value) => value !== undefined)
+          inputs[port.id] = values
+          if (!values.length && !port.optional) {
+            throw new GraphError(
+              `«${node.title}» mangler input «${port.label}» — koble minst én kilde til porten.`,
+            )
+          }
+          continue
+        }
+
+        const edge = edges[edges.length - 1]
         const value = edge ? outputs.get(edge.source)?.[edge.sourcePort] : undefined
         if (value === undefined && !port.optional) {
           throw new GraphError(
