@@ -1,0 +1,163 @@
+import { registry } from '../../nodes'
+import { useGraphStore } from '../../state/useGraphStore'
+import { usePlaybackStore } from '../../state/usePlaybackStore'
+import { ParamField } from '../primitives/Fields'
+import { WAVEFORMS } from '../../engine/animation/lfo'
+
+export function Inspector() {
+  const graph = useGraphStore((s) => s.graph)
+  const selected = useGraphStore((s) => s.selected)
+  const setParam = useGraphStore((s) => s.setParam)
+  const resetParams = useGraphStore((s) => s.resetParams)
+  const removeNode = useGraphStore((s) => s.removeNode)
+  const toggleNode = useGraphStore((s) => s.toggleNode)
+  const setLfo = useGraphStore((s) => s.setLfo)
+  const setKeyframe = useGraphStore((s) => s.setKeyframe)
+  const frame = usePlaybackStore((s) => s.frame)
+
+  const node = graph.nodes.find((n) => n.id === selected)
+
+  if (!node) {
+    return (
+      <div className="p-4 text-[12px] text-zinc-500">
+        Velg en node i grafen for å redigere parametere, keyframes og LFO.
+      </div>
+    )
+  }
+
+  const def = registry.get(node.type)
+
+  return (
+    <div className="flex flex-col gap-4 p-3">
+      <header className="flex items-center justify-between gap-2">
+        <div>
+          <h2 className="text-[13px] font-semibold text-zinc-100">{node.title}</h2>
+          <p className="text-[10px] text-zinc-500">{node.type}</p>
+        </div>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => toggleNode(node.id)}
+            className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+          >
+            {node.enabled === false ? 'Aktiver' : 'Deaktiver'}
+          </button>
+          <button
+            type="button"
+            onClick={() => removeNode(node.id)}
+            className="rounded border border-red-900/70 px-2 py-1 text-[11px] text-red-300 hover:bg-red-950/40"
+          >
+            Slett
+          </button>
+        </div>
+      </header>
+
+      {def.params.length === 0 && (
+        <p className="text-[11px] text-zinc-500">Denne noden har ingen parametere.</p>
+      )}
+
+      {def.params.map((p) => {
+        const value = node.params[p.key] ?? p.default
+        const lfo = node.lfo?.[p.key]
+        const hasKeys = (node.tracks?.[p.key]?.length ?? 0) > 0
+
+        return (
+          <div key={p.key} className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <ParamField
+                  def={p}
+                  value={value}
+                  disabled={node.enabled === false}
+                  onChange={(v) => setParam(node.id, p.key, v)}
+                />
+              </div>
+
+              {p.animatable && (
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    title="Sett keyframe på nåværende frame"
+                    onClick={() => setKeyframe(node.id, p.key, frame, value)}
+                    className={`h-6 w-6 rounded border text-[10px] ${
+                      hasKeys
+                        ? 'border-amber-400 bg-amber-400/20 text-amber-300'
+                        : 'border-zinc-700 text-zinc-500 hover:border-amber-400/60'
+                    }`}
+                  >
+                    ◆
+                  </button>
+                  <button
+                    type="button"
+                    title="Automatisk animasjon (LFO)"
+                    onClick={() => setLfo(node.id, p.key, { on: !lfo?.on })}
+                    className={`h-6 w-6 rounded border text-[10px] ${
+                      lfo?.on
+                        ? 'border-lime-400 bg-lime-400/20 text-lime-300'
+                        : 'border-zinc-700 text-zinc-500 hover:border-lime-400/60'
+                    }`}
+                  >
+                    ∿
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {lfo?.on && (
+              <div className="ml-1 flex flex-col gap-1.5 rounded-lg border border-lime-500/20 bg-lime-500/5 p-2">
+                <label className="flex items-center gap-2">
+                  <span className="w-24 text-[10px] uppercase tracking-wide text-zinc-500">Form</span>
+                  <select
+                    value={lfo.shape}
+                    onChange={(e) =>
+                      setLfo(node.id, p.key, { shape: e.target.value as typeof lfo.shape })
+                    }
+                    className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-[11px] text-zinc-100"
+                  >
+                    {WAVEFORMS.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="w-24 text-[10px] uppercase tracking-wide text-zinc-500">Styrke</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={lfo.amount}
+                    onChange={(e) => setLfo(node.id, p.key, { amount: Number(e.target.value) })}
+                    className="h-1 flex-1 accent-lime-400"
+                  />
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="w-24 text-[10px] uppercase tracking-wide text-zinc-500">Sykluser</span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={8}
+                    step={1}
+                    value={lfo.cycles}
+                    onChange={(e) => setLfo(node.id, p.key, { cycles: Number(e.target.value) })}
+                    className="h-1 flex-1 accent-lime-400"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      <button
+        type="button"
+        onClick={() => resetParams(node.id)}
+        className="self-start rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+      >
+        Tilbakestill parametere
+      </button>
+    </div>
+  )
+}

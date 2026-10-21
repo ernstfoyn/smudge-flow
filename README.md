@@ -1,0 +1,110 @@
+# Smudge Flow
+
+Nodebasert / prosedural versjon av **Smudge Animator** + **Orbit**, bygget rundt en
+dataflyt-arkitektur (DAG).
+
+Dette er et **nytt, separat repo**. Den gamle kodebasen
+(`../Smudge_animator`) er urørt — ingenting er flyttet, slettet eller endret der.
+Logikken er **portert** (kopiert + omskrevet) og verifisert med paritetstester
+mot originalen.
+
+```bash
+npm install
+npm run dev      # http://localhost:5180
+npm test         # 52 tester, inkludert paritet mot gammel kode
+npm run build    # tsc --noEmit && vite build
+```
+
+---
+
+## Hva appen gjør
+
+Du bygger en graf av noder. Hver node har **parametere** som kan animeres med
+keyframes eller LFO, og porter som verdier flyter gjennom. Motoren evaluerer
+grafen topologisk for hver frame og sender resultatet til rendereren.
+
+```
+source.*  ──▶  modifier.*  ──▶  composite.*  ──▶  output.*
+(gradient,     (transform,      (blend)          (viewport,
+ generativ      raster, blur,                     MP4-eksport)
+ grafikk,       pixelate,
+ bilde)         warp)
+```
+
+**Determinisme er en del av API-et.** Alt som evalueres, er en ren funksjon av
+`(inputs, params, ctx.frame, settings)`. Ingen `Date.now()`, ingen
+`Math.random()`, ingen `requestAnimationFrame` inne i en node. Derfor er
+forhåndsvisningen og MP4-eksporten bit-identiske, og lengden på eksporten er
+eksakt `frames / fps` sekunder.
+
+---
+
+## Arkitektur i korthet
+
+| Lag | Path | Ansvarl |
+|---|---|---|
+| Motor | `src/engine/` | Topologisk sortering, evaluering, param-løsning. Ren TypeScript, ingen React, ingen DOM. |
+| Noder | `src/nodes/` | Nodetyper. Hver er en ren kontrakt: porter inn, porter ut. |
+| Render | `src/render/` | Eneste sted som eier canvas/lerret. Portet fra Orbit + Smudge. |
+| Eksport | `src/export/` | MediaBunny (vendored, MPL-2.0) + deterministisk frame-løkke. |
+| Tilstand | `src/state/` | Zustand: graf, avspilling, motor-singletons. |
+| UI | `src/ui/` | React Flow, inspector, timeline, viewport, eksportpanel. |
+
+Detaljer: [`docs/architecture.md`](docs/architecture.md) ·
+Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
+
+---
+
+## Nodetyper i dag
+
+| Type | Kategori | Port fra |
+|---|---|---|
+| `source.gradient` | kilde | Orbit `gradient.js` + `makeGradient()` |
+| `source.motionGraphics` | kilde | Orbit `motion-graphics.js` (prikkefelt, fliser, vifte, striper, ovaler) |
+| `source.image` | kilde | Smudge `trailTexture.js` (bilde/video) |
+| `modifier.transform2D` | modifikator | Ny, erstatter Smudges 3D-transform |
+| `modifier.raster` | modifikator | Orbit `compositor.js` (luminansraster) |
+| `modifier.blur` | modifikator | Orbit `image-effects.js` |
+| `modifier.pixelate` | modifikator | Orbit `image-effects.js` |
+| `modifier.warp` | modifikator | Orbit `image-effects.js` |
+| `composite.blend` | kompositt | Smudge `BlendStage.jsx` (8 blendemodeller) |
+| `output.viewport` | output | Ny — merker leveransen for preview |
+| `output.export` | output | Ny — merker leveransen for MP4 |
+
+---
+
+## Slik legger du til en node
+
+1. Skriv en `NodeDefinition` i `src/nodes/…`:
+
+```ts
+export const myNode: NodeDefinition<{ amount: number }> = {
+  type: 'modifier.myNode',
+  label: 'Min node',
+  category: 'modifier',
+  inputs: [{ id: 'in', label: 'Inn', type: 'canvas' }],
+  outputs: [{ id: 'out', label: 'Ut', type: 'canvas' }],
+  params: [
+    { key: 'amount', label: 'Mengde', type: 'number', default: 1,
+      min: 0, max: 10, step: 0.01, animatable: true },
+  ],
+  evaluate(ctx, { in: input }, p) {
+    const target = ctx.render.canvas(ctx.nodeId)
+    // ... tegn ...
+    return { out: target.canvas }
+  },
+}
+```
+
+2. Registrer den i `src/nodes/index.ts`.
+
+Ferdig. Nodekortet, inspectoren, keyframe-sporet og eksporten leser alle fra
+samme schema — det finnes ingen separat UI-kode per node.
+
+---
+
+## Hva som mangler (fase 7)
+
+3D-laget fra Smudge (three.js, `blob.glsl.js`, `vertex/fragment.glsl.js`,
+trail-penselen) ligger i `src/legacy/smudge/` og er **ikke** portet ennå. Se
+[`docs/legacy-parity.md`](docs/legacy-parity.md) for planen.

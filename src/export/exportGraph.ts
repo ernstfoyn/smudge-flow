@@ -1,0 +1,55 @@
+import type { Graph, NodeId } from '../engine/types'
+import type { Evaluator } from '../engine/evaluator'
+import { encodeFrames, type EncodeResult } from './encodeFrames'
+
+export interface ExportOptions {
+  graph: Graph
+  evaluator: Evaluator
+  /** Node-ID-en som definerer leveransen. */
+  outputNodeId: NodeId
+  canvas: HTMLCanvasElement
+  prefer?: 'mp4' | 'webm'
+  onProgress?: (progress: number, frame: number, total: number) => void
+  signal?: AbortSignal
+}
+
+/**
+ * Koder hele grafen til en video.
+ *
+ * Eksporten bruker SAMME evalueringsmotor som forhåndsvisningen — vi kjører
+ * bare en frame-løkke uten rAF. Derfor blir eksporten bit-identisk med
+ * det du så i forhåndsvisningen.
+ */
+export async function exportGraph(options: ExportOptions): Promise<EncodeResult> {
+  const { graph, evaluator, outputNodeId, canvas } = options
+  const { fps, frames, width, height } = graph.settings
+
+  if (canvas.width !== width) canvas.width = width
+  if (canvas.height !== height) canvas.height = height
+
+  const ctx = canvas.getContext('2d')!
+
+  return encodeFrames({
+    canvas,
+    fps,
+    frames,
+    prefer: options.prefer,
+    signal: options.signal,
+    onProgress: options.onProgress,
+    render: async (frame) => {
+      const outputs = await evaluator.evaluateFrame(graph, frame, [outputNodeId], {
+        signal: options.signal,
+      })
+      const source = outputs.get(outputNodeId)?.frame as CanvasImageSource | undefined
+      if (!source) throw new Error('Output-noden produserte ingen frame.')
+
+      ctx.save()
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.globalAlpha = 1
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.clearRect(0, 0, width, height)
+      ctx.drawImage(source, 0, 0, width, height)
+      ctx.restore()
+    },
+  })
+}
