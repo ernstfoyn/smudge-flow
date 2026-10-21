@@ -30,11 +30,16 @@ export function Viewport() {
     state.current.dirty = true
   }, [graph])
 
-  // Renderstørrelsen følger grafens innstillinger.
+  // Renderstørrelsen følger grafens innstillinger, nedskalert i forhåndsvisning.
+  // Eksporten setter størrelsen til full oppløsning (se exportGraph).
+  const scale = Math.min(1, Math.max(0.25, graph.settings.previewScale ?? 1))
   useEffect(() => {
-    renderServices.setSize(graph.settings.width, graph.settings.height)
+    renderServices.setSize(
+      Math.max(16, Math.round(graph.settings.width * scale)),
+      Math.max(16, Math.round(graph.settings.height * scale)),
+    )
     state.current.dirty = true
-  }, [graph.settings.width, graph.settings.height])
+  }, [graph.settings.width, graph.settings.height, scale])
 
   useEffect(() => {
     let raf = 0
@@ -69,6 +74,8 @@ export function Viewport() {
 
       const canvas = canvasRef.current
       if (!canvas) return
+      // Lerretet er alltid full grafoppløsning; kilden tegnes nedskalert
+      // og skaleres opp, slik at previewen blir raskere i store grafer.
       if (canvas.width !== current.settings.width) canvas.width = current.settings.width
       if (canvas.height !== current.settings.height) canvas.height = current.settings.height
 

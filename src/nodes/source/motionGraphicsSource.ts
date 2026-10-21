@@ -46,7 +46,7 @@ export const motionGraphicsSource: NodeDefinition<MotionGraphicsParams> = {
     { key: 'colorB', label: 'Farge B', type: 'color', default: '#4bdac5' },
   ],
   evaluate(ctx, _inputs, p) {
-    const target = ctx.render.canvas(ctx.nodeId)
+    const target = ctx.render.canvas(ctx.scopeKey)
     const { ctx: c, width: w, height: h } = target
 
     c.save()

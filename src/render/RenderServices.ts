@@ -10,6 +10,8 @@ export class BrowserRenderServices implements RenderServices {
   private canvases = new Map<string, CanvasTarget>()
   private images = new Map<string, Promise<HTMLImageElement>>()
   private videos = new Map<string, HTMLVideoElement>()
+  /** Versjon per lerret — brukes til memo i motoren. */
+  private versions = new WeakMap<object, number>()
 
   constructor(
     public width: number,
@@ -30,10 +32,23 @@ export class BrowserRenderServices implements RenderServices {
       canvas.width = this.width
       canvas.height = this.height
       const ctx = canvas.getContext('2d', { willReadFrequently: true })!
-      target = { canvas, ctx, width: this.width, height: this.height }
+      target = { canvas, ctx, width: this.width, height: this.height, version: 0 }
       this.canvases.set(key, target)
     }
     return target
+  }
+
+  /** Markerer at lerreret for nøkkelen har nytt innhold. */
+  touch(key: string): void {
+    const target = this.canvases.get(key)
+    if (!target) return
+    target.version += 1
+    this.versions.set(target.canvas, target.version)
+  }
+
+  versionOf(value: unknown): number {
+    if (value && typeof value === 'object') return this.versions.get(value as object) ?? 0
+    return 0
   }
 
   assets = {

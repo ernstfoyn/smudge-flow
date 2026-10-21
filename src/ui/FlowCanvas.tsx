@@ -22,6 +22,9 @@ function FlowInner() {
   const moveNode = useGraphStore((s) => s.moveNode)
   const connect = useGraphStore((s) => s.connect)
   const addNode = useGraphStore((s) => s.addNode)
+  const setSelection = useGraphStore((s) => s.setSelection)
+  const groupSelection = useGraphStore((s) => s.groupSelection)
+  const selection = useGraphStore((s) => s.selection)
   const reactFlow = useReactFlow()
 
   const nodes: Node[] = useMemo(
@@ -72,6 +75,13 @@ function FlowInner() {
     [connect],
   )
 
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes }: { nodes: Node[] }) => {
+      setSelection(selectedNodes.map((n) => n.id))
+    },
+    [setSelection],
+  )
+
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault()
@@ -90,7 +100,9 @@ function FlowInner() {
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
+        onSelectionChange={onSelectionChange}
         onConnect={onConnect}
+        multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
         fitView
         proOptions={{ hideAttribution: true }}
         minZoom={0.2}
@@ -109,8 +121,19 @@ function FlowInner() {
           nodeBorderRadius={3}
         />
       </ReactFlow>
+
+      {selection.length > 1 && (
+        <button
+          type="button"
+          onClick={() => groupSelection()}
+          className="absolute left-3 top-3 rounded-lg border border-violet-500/50 bg-violet-500/15 px-3 py-1.5 text-[11px] font-medium text-violet-100 backdrop-blur transition hover:bg-violet-500/25"
+        >
+          ⬚ Lag gruppe ({selection.length} noder)
+        </button>
+      )}
+
       <span className="pointer-events-none absolute bottom-2 left-2 text-[10px] text-zinc-600">
-        Dra noder fra paletten hitte · klikk i en port for å koble
+        Dra noder fra paletten hitte · Shift-klikk for å merke flere · lille håndtak styrer parametere
       </span>
     </div>
   )

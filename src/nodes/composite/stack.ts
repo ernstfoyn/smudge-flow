@@ -55,7 +55,7 @@ export const stack: NodeDefinition<StackParams> = {
     { key: 'reverse', label: 'Reverser rekkefølge', type: 'boolean', default: false },
   ],
   evaluate(ctx, { in: layers }, p) {
-    const target = ctx.render.canvas(ctx.nodeId)
+    const target = ctx.render.canvas(ctx.scopeKey)
     const c = target.ctx
 
     const list = (Array.isArray(layers) ? layers : layers ? [layers] : []) as CanvasImageSource[]

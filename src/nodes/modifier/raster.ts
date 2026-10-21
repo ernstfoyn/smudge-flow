@@ -55,7 +55,7 @@ export const raster: NodeDefinition<RasterParams> = {
     },
   ],
   evaluate(ctx, { in: input }, p) {
-    const target = ctx.render.canvas(ctx.nodeId)
+    const target = ctx.render.canvas(ctx.scopeKey)
     const source = input as HTMLCanvasElement
 
     if (!source) {

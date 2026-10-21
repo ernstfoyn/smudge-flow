@@ -62,13 +62,17 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `source.gradient` | kilde | Orbit `gradient.js` + `makeGradient()` |
 | `source.motionGraphics` | kilde | Orbit `motion-graphics.js` (prikkefelt, fliser, vifte, striper, ovaler) |
 | `source.image` | kilde | Smudge `trailTexture.js` (bilde/video) |
+| `source.loop` | kilde | Ny — løkkesikre verdier fra loop-algoritmer |
+| `source.mesh3D` | kilde | Ny — prosedural 3D-geometri (boks/kule/torus/plan/sylinder/ikosaeder) |
 | `modifier.transform2D` | modifikator | Ny, erstatter Smudges 3D-transform |
+| `modifier.transform3D` | modifikator | Ny — flytter/roterer 3D-objekter |
 | `modifier.raster` | modifikator | Orbit `compositor.js` (luminansraster) |
 | `modifier.blur` | modifikator | Orbit `image-effects.js` |
 | `modifier.pixelate` | modifikator | Orbit `image-effects.js` |
 | `modifier.warp` | modifikator | Orbit `image-effects.js` |
 | `composite.blend` | kompositt | Smudge `BlendStage.jsx` (8 blendemodeller) |
 | `composite.stack` | kompositt | Ny — kombinerer N lag i én node |
+| `composite.sceneRender` | kompositt | Ny — maler 3D ned på raster (bro mellom 2D og 3D) |
 | `output.viewport` | output | Ny — merker leveransen for preview |
 | `output.export` | output | Ny — merker leveransen for MP4 |
 
@@ -82,6 +86,57 @@ Rekkefølgen kan endres i inspectoren (↑/↓ per lag).
 > Merk: en inngangsport på en vanlig node holder **én** kobling. Koble du en
 > tredje kilde inn i «Bunn», erstattes den gamle forbindelsen — appen varsler
 > om dette og peker på lagstabelen.
+
+---
+
+## Gjenbrukbare workflows: gruppe-noder
+
+En gruppe-node er en graf inni grafen. Den lar deg bygge behandlingskjeden
+én gang og bruke den på nytt innhold.
+
+**Så gjør du det:**
+
+1. **Merk** nodene i behandlingen (Shift-klikk) → trykk «⬚ Lag gruppe».
+2. **Eksponer** portene du vil bytte: i inspectoren under «Innhold · eksponer
+   porter» kan du gjøre en intern port til en inngang eller utgang. Den blir
+   et håndtak på gruppen.
+3. **Koble** en ny kilde inn i inngangshåndtaket.
+4. **Kopier** gruppen («⧉ Lag kopi») for å bruke samme behandling på nytt
+   innhold. Kopien får egne interne noder, så den er en selvstendig instans.
+
+Eksponerte innganger er overstyrbare: den interne kilden beholdes som
+standard, men en ekstern kilde som kobles til porten vinner.
+
+---
+
+## Automatisert looping
+
+`source.loop` lager verdier som er **løkkesikre** — verdien ved frame 0 er
+identisk med verdien ved frame N, så loopen hopper aldri.
+
+Koble utgangen «Verdi» til en parameter i en annen node (det lille håndtaket
+ved parameteren i nodekortet), og kjeden blir automatisert:
+
+```
+source.loop ──value──▶ modifier.raster.param:cellSize
+```
+
+Algoritmer: sine, trekant, sag, firkant og løkkesikker støy. Vindu
+`pingpong` eller `cosine` former kurven slik at den starter og slutter likt.
+
+---
+
+## 2D og 3D i samme graf
+
+3D-noden kjøres gjennom geometri, ikke piksler:
+
+```
+source.mesh3D ──▶ modifier.transform3D ──▶ composite.sceneRender ──▶ composite.stack ──▶ output.viewport
+```
+
+`composite.sceneRender` maler 3D-objektene ned på et raster-lerret, slik at
+de kan blandes med 2D-lag, rastereffekter og eksporteres som vanlig.
+three.js lastes bare når 3D faktisk brukes.
 
 ---
 

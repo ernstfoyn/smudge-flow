@@ -1,4 +1,4 @@
-import { registry } from '../../nodes'
+import { nodeParamDefs } from '../../engine/graph'
 import { useGraphStore } from '../../state/useGraphStore'
 import { usePlaybackStore } from '../../state/usePlaybackStore'
 
@@ -25,10 +25,10 @@ export function Timeline() {
 
   const tracks: Track[] = []
   for (const node of graph.nodes) {
-    const def = registry.get(node.type)
+    const params = nodeParamDefs(node)
     for (const [path, keys] of Object.entries(node.tracks ?? {})) {
       if (!keys?.length) continue
-      const param = def.params.find((p) => p.key === path)
+      const param = params.find((p) => p.key === path)
       tracks.push({
         nodeId: node.id,
         nodeTitle: node.title,
@@ -157,8 +157,8 @@ export function Timeline() {
           if (!selected) return
           const node = useGraphStore.getState().graph.nodes.find((n) => n.id === selected)
           if (!node) return
-          const def = registry.get(node.type)
-          for (const p of def.params) {
+          const params = nodeParamDefs(node)
+          for (const p of params) {
             if (!p.animatable) continue
             setKeyframe(node.id, p.key, frame, node.params[p.key] ?? p.default)
           }

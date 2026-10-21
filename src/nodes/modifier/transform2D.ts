@@ -26,7 +26,7 @@ export const transform2D: NodeDefinition<Transform2DParams> = {
     { key: 'opacity', label: 'Dekkevne', type: 'number', default: 1, min: 0, max: 1, step: 0.01, animatable: true },
   ],
   evaluate(ctx, { in: input }, p) {
-    const target = ctx.render.canvas(ctx.nodeId)
+    const target = ctx.render.canvas(ctx.scopeKey)
     const { ctx: c, width: w, height: h } = target
 
     c.save()

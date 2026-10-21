@@ -1,6 +1,7 @@
 import type { Graph, NodeId } from '../engine/types'
 import type { Evaluator } from '../engine/evaluator'
 import { encodeFrames, type EncodeResult } from './encodeFrames'
+import type { BrowserRenderServices } from '../render/RenderServices'
 
 export interface ExportOptions {
   graph: Graph
@@ -11,6 +12,11 @@ export interface ExportOptions {
   prefer?: 'mp4' | 'webm'
   onProgress?: (progress: number, frame: number, total: number) => void
   signal?: AbortSignal
+  /**
+   * Renderstørrelsen. Eksporten kjører alltid i FULL oppløsning,
+   * uansett hva forhåndsvisningen er nedskalert til.
+   */
+  render?: BrowserRenderServices
 }
 
 /**
@@ -23,6 +29,9 @@ export interface ExportOptions {
 export async function exportGraph(options: ExportOptions): Promise<EncodeResult> {
   const { graph, evaluator, outputNodeId, canvas } = options
   const { fps, frames, width, height } = graph.settings
+
+  // Full oppløsning under eksport.
+  options.render?.setSize(width, height)
 
   if (canvas.width !== width) canvas.width = width
   if (canvas.height !== height) canvas.height = height

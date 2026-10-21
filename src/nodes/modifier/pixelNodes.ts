@@ -30,7 +30,7 @@ export const blurNode: NodeDefinition = {
     { key: 'radius', label: 'Radius', type: 'number', default: 6, min: 0, max: 30, step: 1, animatable: true },
   ],
   evaluate(ctx: EvalContext, { in: input }, p) {
-    const target = ctx.render.canvas(ctx.nodeId)
+    const target = ctx.render.canvas(ctx.scopeKey)
     const source = input as HTMLCanvasElement | undefined
     if (!source) {
       target.ctx.clearRect(0, 0, target.width, target.height)
@@ -53,7 +53,7 @@ export const pixelateNode: NodeDefinition = {
     { key: 'pixelSize', label: 'Pikselstørrelse', type: 'int', default: 12, min: 1, max: 120, animatable: true },
   ],
   evaluate(ctx: EvalContext, { in: input }, p) {
-    const target = ctx.render.canvas(ctx.nodeId)
+    const target = ctx.render.canvas(ctx.scopeKey)
     const source = input as HTMLCanvasElement | undefined
     if (!source) {
       target.ctx.clearRect(0, 0, target.width, target.height)
@@ -85,7 +85,7 @@ export const warpNode: NodeDefinition = {
     { key: 'cycles', label: 'Sykluser', type: 'number', default: 1, min: 1, max: 8, animatable: true },
   ],
   evaluate(ctx: EvalContext, { in: input }, p) {
-    const target = ctx.render.canvas(ctx.nodeId)
+    const target = ctx.render.canvas(ctx.scopeKey)
     const source = input as HTMLCanvasElement | undefined
     if (!source) {
       target.ctx.clearRect(0, 0, target.width, target.height)

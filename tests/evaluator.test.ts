@@ -20,6 +20,8 @@ function fakeRender(): RenderServices {
         throw new Error('Ikke støttet i test')
       },
     },
+    touch: () => {},
+    versionOf: () => 0,
     dispose: () => {},
   }
 }

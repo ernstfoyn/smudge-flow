@@ -70,7 +70,7 @@ export const gradientSource: NodeDefinition<GradientParams> = {
     { key: 'density', label: 'Tetthet', type: 'number', default: 2, min: 0.5, max: 8, step: 0.5, animatable: true },
   ],
   evaluate(ctx, _inputs, p) {
-    const target = ctx.render.canvas(ctx.nodeId)
+    const target = ctx.render.canvas(ctx.scopeKey)
     const { ctx: c, width: w, height: h } = target
     c.save()
     c.setTransform(1, 0, 0, 1, 0, 0)

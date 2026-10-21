@@ -49,7 +49,7 @@ export const blend: NodeDefinition<BlendParams> = {
     { key: 'opacity', label: 'Dekkevne', type: 'number', default: 0.85, min: 0, max: 1, step: 0.01, animatable: true },
   ],
   evaluate(ctx, { base, top }, p) {
-    const target = ctx.render.canvas(ctx.nodeId)
+    const target = ctx.render.canvas(ctx.scopeKey)
     const c = target.ctx
 
     c.save()

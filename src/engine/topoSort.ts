@@ -1,4 +1,4 @@
-import type { Graph, NodeId } from './types'
+import type { Graph, GraphEdge, GraphNode, NodeId } from './types'
 
 export interface TopoResult {
   /** Noder i evalueringsrekkefølge (kildene først). */
@@ -9,21 +9,28 @@ export interface TopoResult {
 /**
  * Kahn på delgrafen som mater `targets`.
  *
- * - Deterministisk: noder med lik indegree sorteres etter rekkefølgen i graph.nodes.
+ * - Deterministisk: noder med lik indegree sorteres etter rekkefølgen i nodes.
  * - Kilder som ikke har noen inngående kant, evalueres først.
  * - Syklus gir en lesbar feilmelding i stedet for en evig løkke.
+ *
+ * Både verdi-kanter og parameter-kanter er avhengigheter: en node som
+ * driver en parameter må evalueres etter kilden sin.
  */
-export function topoSort(graph: Graph, targets: NodeId[]): TopoResult {
-  const byId = new Map(graph.nodes.map((n) => [n.id, n]))
+export function topoSortScope(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  targets: NodeId[],
+): TopoResult {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
   const upstream = new Map<NodeId, NodeId[]>()
   const downstream = new Map<NodeId, NodeId[]>()
 
-  for (const n of graph.nodes) {
+  for (const n of nodes) {
     upstream.set(n.id, [])
     downstream.set(n.id, [])
   }
 
-  for (const e of graph.edges) {
+  for (const e of edges) {
     const src = byId.get(e.source)
     const dst = byId.get(e.target)
     if (!src || !dst) continue
@@ -44,7 +51,7 @@ export function topoSort(graph: Graph, targets: NodeId[]): TopoResult {
   }
 
   // 2) Kahn med stabil sortering.
-  const index = new Map(graph.nodes.map((n, i) => [n.id, i]))
+  const index = new Map(nodes.map((n, i) => [n.id, i]))
   const indegree = new Map<NodeId, number>()
   for (const id of needed) {
     indegree.set(id, upstream.get(id)!.filter((p) => needed.has(p)).length)
@@ -77,6 +84,11 @@ export function topoSort(graph: Graph, targets: NodeId[]): TopoResult {
         ]
 
   return { order, errors }
+}
+
+/** Innpakning for en hel graf. */
+export function topoSort(graph: Graph, targets: NodeId[]): TopoResult {
+  return topoSortScope(graph.nodes, graph.edges, targets)
 }
 
 /**

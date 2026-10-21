@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useGraphStore } from '../../state/useGraphStore'
-import { evaluator } from '../../state/studio'
+import { evaluator, renderServices } from '../../state/studio'
 import { exportGraph } from '../../export/exportGraph'
 
 interface Status {
@@ -46,6 +46,7 @@ export function ExportPanel() {
         canvas,
         prefer,
         signal: controller.signal,
+        render: renderServices,
         onProgress: (p, frame, total) =>
           setStatus({
             kind: 'running',
@@ -117,6 +118,28 @@ export function ExportPanel() {
         <p className="text-[10px] leading-relaxed text-zinc-500">
           {graph.settings.fps} fps · {graph.settings.frames} frames ·{' '}
           {(graph.settings.frames / graph.settings.fps).toFixed(2)} s
+        </p>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+          Forhåndsvisning
+        </h3>
+        <label className="flex items-center gap-2">
+          <span className="w-20 text-[11px] text-zinc-400">Kvalitet</span>
+          <select
+            value={String(graph.settings.previewScale ?? 1)}
+            onChange={(e) => setSettings({ previewScale: Number(e.target.value) })}
+            className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100"
+          >
+            <option value="1">Full oppløsning (100 %)</option>
+            <option value="0.5">Halv oppløsning (50 %)</option>
+            <option value="0.25">Kvart oppløsning (25 %)</option>
+          </select>
+        </label>
+        <p className="text-[10px] leading-relaxed text-zinc-600">
+          Forhåndsvisningen kan tegnes i lavere oppløsning i store grafer.
+          Eksporten bruker alltid full oppløsning.
         </p>
       </section>
 

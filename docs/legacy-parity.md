@@ -27,6 +27,16 @@ med tester som sammenligner gammel og ny implementasjon.
 | `video-export.js` | `src/export/encodeFrames.ts` | ✅ portet | ✅ verifisert i nettleser |
 | `sketch.js` (1110 l) | `src/nodes/…` + `src/render/…` | 🟡 delvis | se under |
 
+### Nye, smudge-uavhengige deler
+
+| Del | Plassering | Status |
+|---|---|---|
+| Gruppe-noder (subgrafer) | `engine/graph.ts` + `engine/evaluator.ts` | ✅ ferdig |
+| Parameter-koblinger | `engine/evaluator.ts` + `state/useGraphStore.ts` | ✅ ferdig |
+| Loop-generator | `nodes/source/loopSource.ts` | ✅ ferdig (løkkesikkerhetstester) |
+| 3D-verdidom | `render/three/*` + `nodes/source/mesh3D.ts` | ✅ ferdig |
+| Memoisering / ytelse | `engine/evaluator.ts` | ✅ ferdig |
+
 ### Smudge (`src/`) — ikke portet ennå
 
 | Legacy-fil | Status | Plan |
@@ -38,7 +48,7 @@ med tester som sammenligner gammel og ny implementasjon.
 | `src/scene/BlendStage.jsx` | ✅ portet til `src/nodes/composite/blend.ts` | — |
 | `src/scene/Stage.jsx` | 🟡 delvis | blir `ui/Viewport.tsx` + `render/RenderServices.ts` |
 | `src/scene/BlobView.jsx` | ⬜ fase 7 | `source.blob3D` |
-| `src/shaders/fragment.glsl.js` | ⬜ fase 7 | `modifier.smudgeMaterial` → én node per look |
+| `src/shaders/fragment.glsl.js` | ⬜ neste runde | `modifier.smudgeMaterial` → én node per look |
 | `src/shaders/vertex.glsl.js` | ⬜ fase 7 | samme |
 | `src/shaders/blob.glsl.js` | ⬜ fase 7 | `source.blob3D` |
 | `src/shaders/noise.glsl.js` | ⬜ fase 7 | deles som GLSL-chunks |

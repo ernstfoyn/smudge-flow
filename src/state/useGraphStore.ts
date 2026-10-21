@@ -1,6 +1,15 @@
 import { create } from 'zustand'
 import type { Graph, GraphSettings, Keyframe, LfoConfig, NodeId } from '../engine/types'
-import { canConnectTypes, findPort } from '../engine/graph'
+import {
+  PARAM_PORT_PREFIX,
+  canConnectTypes,
+  createGroupFromSelection,
+  explodeGroup,
+  findPort,
+  nodeParamDefs,
+  nodePorts,
+  rekeySubgraph,
+} from '../engine/graph'
 import { wouldCreateCycle } from '../engine/topoSort'
 import { upsertKey } from '../engine/animation/keyframes'
 import { registry } from '../nodes'
@@ -9,6 +18,8 @@ import { defaultGraph, makeNode } from './defaultGraph'
 interface GraphState {
   graph: Graph
   selected: NodeId | null
+  /** Markert utvalg (brukkes til å lage grupper). */
+  selection: NodeId[]
   /** Kort melding om siste kobling (feil eller info). */
   notice: string | null
 
@@ -24,6 +35,21 @@ interface GraphState {
   reorderInput: (nodeId: NodeId, portId: string, from: number, to: number) => void
   clearNotice: () => void
 
+  /** Lager en gruppe-node av markerte noder. */
+  groupSelection: (ids?: NodeId[]) => NodeId | null
+  /** Exploderer en gruppe-node tilbake til enkelte noder. */
+  ungroup: (id: NodeId) => void
+  /** Lager en ny kopi av en node (eller gruppe). */
+  instantiate: (id: NodeId, offset?: { x: number; y: number }) => NodeId | null
+  /** Eksponerer en intern port som inngang i gruppen. */
+  exposeInput: (groupId: NodeId, targetNode: NodeId, targetPort: string) => void
+  /** Eksponerer en intern port som utgang fra gruppen. */
+  exposeOutput: (groupId: NodeId, sourceNode: NodeId, sourcePort: string) => void
+  /** Fjerner en eksponert inngang. */
+  unexposeInput: (groupId: NodeId, inputId: string) => void
+  /** Fjerner en eksponert utgang. */
+  unexposeOutput: (groupId: NodeId, outputId: string) => void
+
   setParam: (id: NodeId, key: string, value: unknown) => void
   resetParams: (id: NodeId) => void
   setKeyframe: (id: NodeId, path: string, frame: number, value: unknown) => void
@@ -32,6 +58,7 @@ interface GraphState {
 
   setSettings: (patch: Partial<GraphSettings>) => void
   select: (id: NodeId | null) => void
+  setSelection: (ids: NodeId[]) => void
   reset: () => void
 }
 
@@ -41,6 +68,7 @@ const nextId = (type: string) => `${type}-${Date.now().toString(36)}-${counter++
 export const useGraphStore = create<GraphState>((set, get) => ({
   graph: defaultGraph(),
   selected: null,
+  selection: [],
   notice: null,
 
   setGraph: (graph) => set({ graph }),
@@ -97,19 +125,61 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       return false
     }
 
-    const sourceDef = registry.get(graph.nodes.find((n) => n.id === source)?.type ?? '')
-    const targetDef = registry.get(graph.nodes.find((n) => n.id === target)?.type ?? '')
+    const sourceNode = graph.nodes.find((n) => n.id === source)
+    const targetNode = graph.nodes.find((n) => n.id === target)
+    if (!sourceNode || !targetNode) return false
 
-    const outPort = findPort(sourceDef.outputs, sourcePort)
-    const inPort = findPort(targetDef.inputs, targetPort)
-    if (!outPort || !inPort) return false
+    const sourcePorts = nodePorts(sourceNode)
+    const targetPorts = nodePorts(targetNode)
+
+    const outPort = findPort(sourcePorts.outputs, sourcePort)
+    if (!outPort) return false
+
+    // --- Parameter-kobling: verdien driver en parameter --------------------
+    if (targetPort.startsWith(PARAM_PORT_PREFIX)) {
+      const key = targetPort.slice(PARAM_PORT_PREFIX.length)
+      const param = nodeParamDefs(targetNode).find((p) => p.key === key)
+      if (!param) return false
+      if (outPort.type !== 'number' || (param.type !== 'number' && param.type !== 'int')) {
+        set({
+          notice: `«${param.label}» kan bare styres fra en tallkilde (${param.type}).`,
+        })
+        return false
+      }
+
+      const id = `${source}.${sourcePort}->${target}.${targetPort}`
+      set({
+        graph: {
+          ...graph,
+          edges: [
+            ...graph.edges.filter((e) => !(e.kind === 'param' && e.target === target && e.targetParam === key)),
+            {
+              id,
+              source,
+              sourcePort,
+              target,
+              targetPort,
+              kind: 'param',
+              targetParam: key,
+            },
+          ],
+        },
+        notice: `«${param.label}» styres nå av «${sourceNode.title}».`,
+      })
+      return true
+    }
+
+    const inPort = findPort(targetPorts.inputs, targetPort)
+    if (!inPort) return false
     if (!canConnectTypes(outPort.type, inPort.type)) {
       set({ notice: `Kan ikke koble ${outPort.type} til ${inPort.type}.` })
       return false
     }
 
     const id = `${source}.${sourcePort}->${target}.${targetPort}`
-    const existing = graph.edges.filter((e) => e.target === target && e.targetPort === targetPort)
+    const existing = graph.edges.filter(
+      (e) => e.target === target && e.targetPort === targetPort && e.kind !== 'param',
+    )
 
     if (inPort.multiple) {
       // Flere lag tillatt: behold alle, den nye legges på toppen.
@@ -129,7 +199,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       graph: {
         ...graph,
         edges: [
-          ...graph.edges.filter((e) => !(e.target === target && e.targetPort === targetPort)),
+          ...graph.edges.filter(
+            (e) => !(e.target === target && e.targetPort === targetPort && e.kind !== 'param'),
+          ),
           { id, source, sourcePort, target, targetPort },
         ],
       },
@@ -170,6 +242,175 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   clearNotice: () => set({ notice: null }),
 
+  /**
+   * Lager en gruppe-node av markerte noder.
+   *
+   * Kantene som krysser grensen blir eksponert som innganger/utganger, så
+   * gruppen kan kobles inn i en større graf. Slik får du en gjenbrukbbar
+   * behandlingsblokk: bygg kjeden én gang, bytt bare innholdet.
+   */
+  groupSelection: (ids) => {
+    const { graph, selection } = get()
+    const picked = (ids ?? selection).filter((id) => graph.nodes.some((n) => n.id === id))
+    if (picked.length < 1) {
+      set({ notice: 'Merk minst én node for å lage en gruppe.' })
+      return null
+    }
+
+    const groupId = nextId('group')
+    const { node, edges } = createGroupFromSelection(graph.nodes, graph.edges, picked, groupId)
+
+    set({
+      graph: {
+        ...graph,
+        nodes: [...graph.nodes.filter((n) => !picked.includes(n.id)), node],
+        edges,
+      },
+      selected: groupId,
+      selection: [groupId],
+      notice: `Lagde gruppe «${node.title}» med ${node.group?.nodes.length ?? 0} noder.`,
+    })
+    return groupId
+  },
+
+  /** Exploderer en gruppe-node tilbake til enkelte noder. */
+  ungroup: (id) => {
+    const { graph } = get()
+    const node = graph.nodes.find((n) => n.id === id)
+    if (!node?.group) return
+
+    const { nodes, edges } = explodeGroup(graph.nodes, graph.edges, node)
+    set({
+      graph: { ...graph, nodes, edges },
+      selected: null,
+      selection: node.group.nodes.map((n) => n.id),
+      notice: 'Gruppen ble eksplodert.',
+    })
+  },
+
+  /**
+   * Lager en ny kopi av en node — eller av en hel gruppe.
+   * Dette er veien til «samme behandling, nytt innhold».
+   */
+  instantiate: (id, offset = { x: 60, y: 60 }) => {
+    const { graph } = get()
+    const node = graph.nodes.find((n) => n.id === id)
+    if (!node) return null
+
+    const copyId = nextId(node.type)
+    const copy = structuredClone(node)
+    copy.id = copyId
+    copy.title = `${node.title} kopi`
+    copy.position = { x: node.position.x + offset.x, y: node.position.y + offset.y }
+
+    // En kopi må ha egne node-ID-er, ellers deler den lerret og tilstand
+    // med originalen — og de to ville overskrive hverandre.
+    if (copy.group) {
+      copy.group = rekeySubgraph(copy.group, copyId)
+    }
+
+    set({
+      graph: { ...graph, nodes: [...graph.nodes, copy] },
+      selected: copyId,
+      selection: [copyId],
+      notice: `Lagde kopi av «${node.title}».`,
+    })
+    return copyId
+  },
+
+  /**
+   * Eksponerer en intern port som inngang i gruppen.
+   *
+   * Dette er nøkkelen til gjenbrukbare workflows: eksponer «Bunn» i
+   * behandlingskjeden, og du kan koble hvilket som helst innhold inn i
+   * gruppen senere. Uten en eksponert inngang er gruppen lukket.
+   */
+  exposeInput: (groupId, targetNode, targetPort) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) => {
+          if (n.id !== groupId || !n.group) return n
+          const group = structuredClone(n.group)
+          if (group.inputs.some((i) => i.targetNode === targetNode && i.targetPort === targetPort)) {
+            return n
+          }
+          const target = group.nodes.find((node) => node.id === targetNode)
+          if (!target) return n
+          const port = nodePorts(target).inputs.find((p) => p.id === targetPort)
+          if (!port) return n
+
+          group.inputs.push({
+            id: `in-${group.inputs.length}`,
+            name: port.label,
+            type: port.type,
+            targetNode,
+            targetPort,
+            multiple: port.multiple,
+          })
+          return { ...n, group }
+        }),
+      },
+      notice: 'Inngang eksponert. Koble en kilde til den nye porten.',
+    })),
+
+  /** Eksponerer en intern port som utgang fra gruppen. */
+  exposeOutput: (groupId, sourceNode, sourcePort) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) => {
+          if (n.id !== groupId || !n.group) return n
+          const group = structuredClone(n.group)
+          if (group.outputs.some((o) => o.sourceNode === sourceNode && o.sourcePort === sourcePort)) {
+            return n
+          }
+          const source = group.nodes.find((node) => node.id === sourceNode)
+          if (!source) return n
+          const port = nodePorts(source).outputs.find((p) => p.id === sourcePort)
+          if (!port) return n
+
+          group.outputs.push({
+            id: `out-${group.outputs.length}`,
+            name: port.label,
+            type: port.type,
+            sourceNode,
+            sourcePort,
+          })
+          return { ...n, group }
+        }),
+      },
+      notice: 'Utgang eksponert.',
+    })),
+
+  unexposeInput: (groupId, inputId) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) => {
+          if (n.id !== groupId || !n.group) return n
+          const group = structuredClone(n.group)
+          group.inputs = group.inputs.filter((i) => i.id !== inputId)
+          return { ...n, group }
+        }),
+      },
+      notice: null,
+    })),
+
+  unexposeOutput: (groupId, outputId) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) => {
+          if (n.id !== groupId || !n.group) return n
+          const group = structuredClone(n.group)
+          group.outputs = group.outputs.filter((o) => o.id !== outputId)
+          return { ...n, group }
+        }),
+      },
+      notice: null,
+    })),
+
   setParam: (id, key, value) =>
     set((s) => ({
       graph: {
@@ -186,9 +427,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         ...s.graph,
         nodes: s.graph.nodes.map((n) => {
           if (n.id !== id) return n
-          const def = registry.get(n.type)
           const params: Record<string, unknown> = {}
-          for (const p of def.params) params[p.key] = p.default
+          for (const p of nodeParamDefs(n)) params[p.key] = p.default
           return { ...n, params }
         }),
       },
@@ -243,7 +483,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   setSettings: (patch) =>
     set((s) => ({ graph: { ...s.graph, settings: { ...s.graph.settings, ...patch } } })),
 
-  select: (selected) => set({ selected }),
+  select: (selected) => set({ selected, selection: selected ? [selected] : [] }),
+
+  setSelection: (selection) => set({ selection, selected: selection[selection.length - 1] ?? null }),
 
   reset: () => set({ graph: defaultGraph(), selected: null }),
 }))

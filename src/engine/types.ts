@@ -6,7 +6,7 @@
  * (denne filen) og en *implementasjon* (src/render/RenderServices.ts).
  *
  * Tidskontrakt: evaluate() må være en ren funksjon av
- *   (inputs, params, ctx.frame, graph.settings).
+ *   (inputs, params, ctx.frame, settings).
  * Ingen Date.now(), performance.now(), Math.random() eller requestAnimationFrame
  * inne i en node. All tid kommer fra ctx.frame / ctx.phase.
  */
@@ -20,17 +20,19 @@ export type NodeId = string
  *  drawable  = HTMLImageElement | HTMLCanvasElement | ImageBitmap | HTMLVideoElement
  *  canvas    = HTMLCanvasElement (raster-resultat)
  *  frame     = ferdig ramme (RGBA) klart for kompositt/eksport
- *  scene     = 3D-beskrivelse (fase 7)
+ *  object3d  = 3D-objekt (geometri + transform + material)
  *  geometry  = normalisert mesh (vertices/triangles/normals)
  *  material  = materialbeskrivelse (shader + uniforms)
+ *  scene     = 3D-beskrivelse (fase 7)
  */
 export type ValueType =
   | 'drawable'
   | 'canvas'
   | 'frame'
-  | 'scene'
+  | 'object3d'
   | 'geometry'
   | 'material'
+  | 'scene'
   | 'number'
   | 'string'
   | 'boolean'
@@ -43,7 +45,7 @@ export interface PortDef {
   optional?: boolean
   /**
    * Porten kan ha flere innkoblinger.
-   * Da får noden en ARRAY med verdiene, i kantrekkefølge.
+   * Da får noden et ARRAY med verdiene, i kantrekkefølge.
    * (Eks: composite.stack — lagstabel med uendelig mange lag.)
    */
   multiple?: boolean
@@ -63,6 +65,8 @@ export interface ParamDef {
   options?: Array<{ value: string | number; label: string }>
   /** Kan animeres med keyframes eller LFO. */
   animatable?: boolean
+  /** Kan styres fra en annen node (parameter-kobling). */
+  drivable?: boolean
   group?: string
 }
 
@@ -86,6 +90,40 @@ export interface LfoConfig {
   phase: number
 }
 
+/** Eksponert inngang i en gruppe-node. */
+export interface GroupInput {
+  id: string
+  name: string
+  type: ValueType
+  /** Intern node + port som mottar verdien. */
+  targetNode: NodeId
+  targetPort: string
+  /** Flere eksterne kanter kan ramme samme interne port. */
+  multiple?: boolean
+}
+
+/** Eksponert utgang i en gruppe-node. */
+export interface GroupOutput {
+  id: string
+  name: string
+  type: ValueType
+  /** Intern node + port som leverer verdien. */
+  sourceNode: NodeId
+  sourcePort: string
+}
+
+/**
+ * En gruppe-node inneholder sin egen graf.
+ * Dette er det som gjør gjenbrukbare workflows mulige:
+ * bygg behandlingskjeden én gang, eksponer innganger, og bytt bare innholdet.
+ */
+export interface Subgraph {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  inputs: GroupInput[]
+  outputs: GroupOutput[]
+}
+
 export interface GraphNode {
   id: NodeId
   type: string
@@ -97,6 +135,10 @@ export interface GraphNode {
   lfo?: Record<string, LfoConfig>
   position: { x: number; y: number }
   enabled?: boolean
+  /** Innholdet i en gruppe-node (type: 'group'). */
+  group?: Subgraph
+  /** Nodekortet vises sammenklappet. */
+  collapsed?: boolean
 }
 
 export interface GraphEdge {
@@ -105,6 +147,13 @@ export interface GraphEdge {
   sourcePort: string
   target: NodeId
   targetPort: string
+  /**
+   * 'value' = vanlig dataflyt.
+   * 'param'  = verdien fra kilden driver en parameter i målnoden
+   *            (targetParam peker på parameterens nøkkel).
+   */
+  kind?: 'value' | 'param'
+  targetParam?: string
 }
 
 export interface GraphSettings {
@@ -114,6 +163,8 @@ export interface GraphSettings {
   frames: number
   loop: boolean
   background: string
+  /** Skalering av forhåndsvisningen (1 = full oppløsning). */
+  previewScale?: number
 }
 
 export interface Graph {
@@ -128,6 +179,8 @@ export interface CanvasTarget {
   ctx: CanvasRenderingContext2D
   width: number
   height: number
+  /** Øker hver gang innholdet skrives. Brukes til memoisering. */
+  version: number
 }
 
 export interface RenderServices {
@@ -135,6 +188,10 @@ export interface RenderServices {
   readonly height: number
   /** Basseng av canvas, nøklet på nodeId. Samme node gjenbruker lerretet mellom frames. */
   canvas(key: string): CanvasTarget
+  /** Markerer at lerreret for nøkkelen har nytt innhold. */
+  touch(key: string): void
+  /** Versjonen av en verdi (0 for verdier som ikke er lerret). */
+  versionOf(value: unknown): number
   assets: {
     image(src: string): Promise<HTMLImageElement>
     /** Deterministisk: seeker og venter på 'seeked' per frame. */
@@ -145,6 +202,12 @@ export interface RenderServices {
 
 export interface EvalContext {
   nodeId: NodeId
+  /**
+   * Unik nøkkel for noden *innenfor sin scope*.
+   * Brukes til lerret- og cache-nøkler, slik at en node inne i en gruppe
+   * ikke kolliderer med en node utenfor gruppen.
+   */
+  scopeKey: string
   /** Heltall 0..totalFrames-1. */
   frame: number
   fps: number
@@ -159,6 +222,19 @@ export interface EvalContext {
   /** Ressurser som lever over frames for denne noden. */
   nodeCache: Map<string, unknown>
   signal?: AbortSignal
+}
+
+/**
+ * Løser node-definisjoner. Motoren bruker denne i stedet for å være
+ * bundet til applikasjonens register, slik at motoren kan testes isolert
+ * og senere flyttes til en egen pakke.
+ */
+export interface NodeResolver {
+  get(type: string): {
+    inputs: readonly PortDef[]
+    outputs: readonly PortDef[]
+    params: readonly ParamDef[]
+  }
 }
 
 export type InputValues = Record<string, unknown>
@@ -179,4 +255,13 @@ export interface NodeDefinition<P = Record<string, unknown>> {
    * (lastet bilde, parset geometri). Standard er 'frame'.
    */
   cache?: 'frame' | 'static'
+  /**
+   * Er noden avhengig av tiden? Hvis nei, kan motoren hoppe over
+   * evalueringen når innganger og parametere er uendret.
+   *
+   * `true` (standard) = alltid evalueres.
+   * `false`           = kan memoiseres mellom frames.
+   * Funksjon          = avgjøres ut fra de oppløste parameterne.
+   */
+  timeDependent?: boolean | ((params: Record<string, unknown>) => boolean)
 }
