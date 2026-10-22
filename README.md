@@ -64,8 +64,10 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `source.image` | kilde | Smudge `trailTexture.js` (bilde/video) |
 | `source.loop` | kilde | Ny — løkkesikre verdier fra loop-algoritmer |
 | `source.mesh3D` | kilde | Ny — prosedural 3D-geometri (boks/kule/torus/plan/sylinder/ikosaeder) |
+| `source.blob3D` | kilde | Smudge `blob.glsl.js` — raymarchet metaball-form |
 | `modifier.transform2D` | modifikator | Ny, erstatter Smudges 3D-transform |
 | `modifier.transform3D` | modifikator | Ny — flytter/roterer 3D-objekter |
+| `modifier.trail` | modifikator | Smudge `trailTexture.js` — malte stempler, lagret som data |
 | `modifier.smudgeDeform` | modifikator | Smudge `vertex/fragment.glsl.js` — flytende glass, trail, glans |
 | `modifier.look.*` (16 stk) | modifikator | Smudge `fragment.glsl.js` — hver effekt sin node |
 | `modifier.raster` | modifikator | Orbit `compositor.js` (luminansraster) |
@@ -144,6 +146,37 @@ løkke. Nå er de delt:
 **Rekkefølgen bestemmes av kantene i grafen.** Koble Kromatisk før VHS, så
 får du VHS-en på det kromatisk-splittede bildet — og bytter du om, får du
 det andre resultatet.
+
+---
+
+## Trail-laget: maling som data
+
+I den gamle appen var malingslaget et lerret som ble endret mens du malte. Det
+gjorde at en eksport ville gitt **ulikt resultat for hver kjøring**.
+
+Nå er stemplene **data**:
+
+- `modifier.trail` har et inngangslere (bildet) og et lag av stempler
+- Du maler i **maleputen** i inspectoren — dra over puten
+- Hvert stempel lagres som `{ u, v, rotation }` i nodens parametere
+
+Derfor er laget deterministisk, kan kopieres, kan animeres, og gir samme
+resultat ved hver eksport. Maleputen viser lagets faktiske resultat, så du ser
+med én gang hva du maler.
+
+---
+
+## Blob-mode
+
+`source.blob3D` er den raymarchede metaball-formen fra den gamle appen: et
+fullskjerm-kvad marsjerer stråler gjennom et avstandsfelt bygget av smeltede
+primitiver, med bildet pakket på via triplanar mapping.
+
+Den kobles naturlig etter trail-laget, så du kan male inn i formen:
+
+```
+bilde ─▶ modifier.trail ─▶ source.blob3D ─▶ modifier.look.chromatic ─▶ viewport
+```
 
 ---
 

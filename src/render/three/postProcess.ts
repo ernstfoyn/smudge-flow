@@ -4,12 +4,21 @@ import { lookPreamble, postVertexShader } from '../shaders/looks'
 export interface PostOptions {
   /** GLOW-koden for effekten (uten preamble). */
   glsl: string
+  /**
+   * Sant hvis `glsl` er en komplett fragment-shader, med egen main().
+   * Da brukes den som den er, og resten av uniformene settes under.
+   */
+  custom?: boolean
   /** Styrke 0..2. */
   amount: number
   /** Skala/frekvens 0..1. */
   scale: number
   /** Animert tid, i sekunder. */
   time: number
+  /** Ekstra tall-uniformer (vec2 sendes som tallpar). */
+  uniforms?: Record<string, number | [number, number]>
+  /** Ekstra farge-uniformer. */
+  colors?: Record<string, string>
 }
 
 /**
@@ -87,13 +96,14 @@ void main() {
    * uAmount (bl/pw), uScale (sc) og retningen (dir) — akkurat som i den
    * gamle monolittiske shaderen.
    */
-  private materialFor(glsl: string): THREE.ShaderMaterial {
-    const cached = this.materials.get(glsl)
+  private materialFor(glsl: string, custom: boolean): THREE.ShaderMaterial {
+    const key = custom ? `custom:${glsl}` : glsl
+    const cached = this.materials.get(key)
     if (cached) return cached
 
-    const material = new THREE.ShaderMaterial({
-      vertexShader: postVertexShader,
-      fragmentShader: `${lookPreamble}
+    const fragmentShader = custom
+      ? glsl
+      : `${lookPreamble}
 vec3 applyLook(vec3 col, vec2 uv, vec2 centered) {
   float bl = clamp(uAmount, 0.0, 1.0);   // hvor mye den blandes inn
   float pw = uAmount;                   // styrken i effekten selv
@@ -108,7 +118,11 @@ void main() {
   col = applyLook(col, uv, centered);
   gl_FragColor = vec4(col, 1.0);
 }
-`,
+`
+
+    const material = new THREE.ShaderMaterial({
+      vertexShader: postVertexShader,
+      fragmentShader,
       uniforms: {
         uTexture: { value: this.texture },
         uAmount: { value: 1 },
@@ -116,7 +130,7 @@ void main() {
         uTime: { value: 0 },
       },
     })
-    this.materials.set(glsl, material)
+    this.materials.set(key, material)
     return material
   }
 
@@ -127,10 +141,30 @@ void main() {
     this.texture.image = input as TexImageSource
     this.texture.needsUpdate = true
 
-    const material = this.materialFor(options.glsl)
+    const material = this.materialFor(options.glsl, !!options.custom)
     material.uniforms.uAmount.value = options.amount
     material.uniforms.uScale.value = options.scale
     material.uniforms.uTime.value = options.time
+
+    // Ekstra uniformer (blob-shaderen har en hel haug).
+    for (const [name, value] of Object.entries(options.uniforms ?? {})) {
+      if (!material.uniforms[name]) {
+        material.uniforms[name] = { value: 0 }
+      }
+      if (Array.isArray(value)) {
+        material.uniforms[name].value = new THREE.Vector2(value[0], value[1])
+      } else {
+        material.uniforms[name].value = value
+      }
+    }
+    for (const [name, value] of Object.entries(options.colors ?? {})) {
+      if (!material.uniforms[name]) {
+        material.uniforms[name] = { value: new THREE.Color(value) }
+      } else {
+        ;(material.uniforms[name].value as THREE.Color).set(value)
+      }
+    }
+
     this.quad.material = material
 
     this.renderer.setRenderTarget(null)

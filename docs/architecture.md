@@ -343,20 +343,29 @@ får en rød prikk.
 | 7c | **Loop-generator** | ✅ |
 | 7d | **3D: mesh3D, transform3D, sceneRender** | ✅ |
 | 7e | **Smudge-shaderne delt** (grunnmateriale + 16 effektnoder) | ✅ |
-| 7f | Trail-penselen som stamp-liste | ⬜ |
+| 7f | **Trail-laget som stempel-data** | ✅ |
+| 7g | **Blob-mode** (`source.blob3D`) | ✅ |
 | 8 | Scene-editor (lag, 3D-kamera, tekst), undo/redo | ⬜ |
 | 9 | Rydd: slett `src/legacy/`, flytt `src/engine` til `packages/engine` | ⬜ |
 
+### Trail-laget
+
+Malingslaget i den gamle appen var et lerret med tilstand. Nå er stemplene
+**data** i nodens parametere:
+
+```ts
+interface TrailStamp { u: number; v: number; rotation: number }
+```
+
+Maleputen i inspectoren skriver disse, og `modifier.trail` rendrer dem på nytt
+hver frame. Da er laget deterministisk, kan kopieres og animeres, og gir
+samme resultat ved hver eksport.
+
 ### Planlagt for neste runde
 
-- **Smudge-shaderne** (`fragment.glsl.js`) blir først én node
-  (`modifier.smudgeMaterial`) med de eksisterende uniformene, deretter én node
-  per look. Rekkefølgen blir kantene i grafen, ikke en `uLookOrder`-array.
-- **Trail-penselen** blir en `modifier.trail` som tar en **stamp-liste** som
-  data (`Stamp[]` med UV, størrelse, rotasjon). Da blir strøkene animerbare og
-  eksporterbare — i dag er de stateful og tidsavhengige, og ville gitt ulikt
-  resultat per eksport.
 - **Scene-editor**: lag med 2D- og 3D-objekter, 3D-kamera som en node,
   tekst som 3D-geometri (`text-mesh.js` er allerede port-klar).
 - **Undo/redo** (`history.js` er allerede port-klar): signatur-baserte
   snapshots som middleware i store-en.
+- **OBB / tekstur-sampling** (`sampleTexture.js`) som egne noder.
+- **Objekt-import** (`obj-import.js`) som `source.mesh3D`.

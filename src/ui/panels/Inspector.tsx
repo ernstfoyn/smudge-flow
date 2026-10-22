@@ -4,6 +4,7 @@ import { nodeParamDefs, nodePorts } from '../../engine/graph'
 import { useGraphStore } from '../../state/useGraphStore'
 import { usePlaybackStore } from '../../state/usePlaybackStore'
 import { ParamField } from '../primitives/Fields'
+import { TrailPad } from './TrailPad'
 import { WAVEFORMS } from '../../engine/animation/lfo'
 
 /** Tittel på en node, ut fra grafen. */
@@ -360,6 +361,8 @@ export function Inspector() {
           </section>
         )
       })}
+
+      {node.type === 'modifier.trail' && <TrailPad nodeId={node.id} />}
 
       {params.length === 0 && (
         <p className="text-[11px] text-zinc-500">Denne noden har ingen parametere.</p>

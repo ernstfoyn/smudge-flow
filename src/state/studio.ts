@@ -13,6 +13,14 @@ export const renderServices = new BrowserRenderServices(960, 960)
 export const evaluator = new Evaluator(registry, renderServices)
 
 /**
+ * Siste evalueringsresultat per node.
+ *
+ * Brukes av UI-en (maleputen) for å vise hva en node faktisk lagde,
+ * uten å evaluere grafen en gang til.
+ */
+export const lastOutputs = new Map<string, Record<string, unknown>>()
+
+/**
  * Dev-håndtak for inspeksjon fra konsollen:
  *   smudgeFlow.store.getState().graph
  *   smudgeFlow.evaluator.evaluateFrame(graph, 0, ['node-id'])

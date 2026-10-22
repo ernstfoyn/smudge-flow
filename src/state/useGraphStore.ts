@@ -16,6 +16,7 @@ import { registry } from '../nodes'
 import { blockFromSelection } from '../blocks/builder'
 import { useLibraryStore } from './useLibraryStore'
 import type { BlockTemplate } from '../blocks/types'
+import type { TrailStamp } from '../nodes/modifier/trail'
 import { defaultGraph, makeNode } from './defaultGraph'
 
 interface GraphState {
@@ -46,6 +47,10 @@ interface GraphState {
   ungroup: (id: NodeId) => void
   /** Lager en ny kopi av en node (eller gruppe). */
   instantiate: (id: NodeId, offset?: { x: number; y: number }) => NodeId | null
+  /** Legger til et stempel i trail-laget. */
+  addStamp: (id: NodeId, u: number, v: number, newStroke: boolean) => void
+  /** Tømmer trail-laget. */
+  clearStamps: (id: NodeId) => void
   /** Eksponerer en intern port som inngang i gruppen. */
   exposeInput: (groupId: NodeId, targetNode: NodeId, targetPort: string) => void
   /** Eksponerer en intern port som utgang fra gruppen. */
@@ -362,6 +367,49 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     })
     return copyId
   },
+
+  /**
+   * Legger til et stempel i trail-laget.
+   *
+   * Stemplene lagres i nodens params, altså som data. Da er laget
+   * deterministisk: samme stempler gir samme bilde, hver gang.
+   */
+  addStamp: (id, u, v, newStroke) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) => {
+          if (n.id !== id) return n
+          const stamps = Array.isArray(n.params.stamps)
+            ? ([...n.params.stamps] as TrailStamp[])
+            : []
+          const strokeCount = Number(n.params.strokeCount ?? 0)
+          const rotateStrokes = !!n.params.rotateStrokes
+          const rotation = newStroke && rotateStrokes ? (strokeCount % 4) * (Math.PI / 2) : 0
+
+          stamps.push({ u, v, rotation })
+
+          return {
+            ...n,
+            params: {
+              ...n.params,
+              stamps,
+              strokeCount: newStroke ? strokeCount + 1 : strokeCount,
+            },
+          }
+        }),
+      },
+    })),
+
+  clearStamps: (id) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) =>
+          n.id === id ? { ...n, params: { ...n.params, stamps: [], strokeCount: 0 } } : n,
+        ),
+      },
+    })),
 
   /**
    * Eksponerer en intern port som inngang i gruppen.

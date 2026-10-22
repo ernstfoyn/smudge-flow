@@ -51,7 +51,15 @@ export interface PortDef {
   multiple?: boolean
 }
 
-export type ParamType = 'number' | 'int' | 'boolean' | 'color' | 'enum' | 'text'
+export type ParamType =
+  | 'number'
+  | 'int'
+  | 'boolean'
+  | 'color'
+  | 'enum'
+  | 'text'
+  /** En liste med egne widgets (f.eks. malte stempler). */
+  | 'stamps'
 
 export interface ParamDef {
   /** Støtter punktsti, f.eks. "transform.position.x". */
@@ -184,14 +192,20 @@ export interface CanvasTarget {
 }
 
 export interface PostOptions {
-  /** GLOW-koden for effekten. */
+  /** GLOW-koden for effekten, eller en komplett fragment-shader når `custom`. */
   glsl: string
+  /** Sant hvis glsl er en komplett shader med egen main(). */
+  custom?: boolean
   /** Styrke 0..2. */
   amount: number
   /** Skala/frekvens 0..1. */
   scale: number
   /** Animert tid, i sekunder. */
   time: number
+  /** Ekstra tall-uniformer. Et tallpar blir en vec2. */
+  uniforms?: Record<string, number | [number, number]>
+  /** Ekstra farge-uniformer. */
+  colors?: Record<string, string>
 }
 
 export interface RenderServices {

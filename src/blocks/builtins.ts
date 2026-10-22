@@ -143,6 +143,30 @@ function smudgeGlass(): BlockTemplate {
   )
 }
 
+function glassBlob(): BlockTemplate {
+  const b = new TemplateBuilder()
+  const trailNode = b.node('modifier.trail', { brush: 0.28, spacing: 0.2 }, { x: 0, y: 0 })
+  const blob = b.node(
+    'source.blob3D',
+    { shape: 'sphere', material: 'glass', count: 5, size: 0.46, blend: 0.55, morph: 0.45 },
+    { x: 260, y: 0 },
+  )
+  const chromatic = b.node('modifier.look.chromatic', { amount: 0.4 }, { x: 500, y: 0 })
+
+  b.connect(trailNode, 'out', blob, 'in')
+  b.connect(blob, 'out', chromatic, 'in')
+  b.exposeInput(trailNode, 'in', 'Bilde')
+  b.exposeOutput(chromatic, 'out', 'Resultat')
+
+  return withDefaultSources(
+    b.build(
+      'Glass-blob',
+      'Malte stempler i en raymarchet glassform, med kromatisk spalting.',
+      'Behandling',
+    ),
+  )
+}
+
 export const BUILTIN_BLOCKS: BlockTemplate[] = [
   generativeBakgrunn(),
   rasterBehandling(),
@@ -150,4 +174,5 @@ export const BUILTIN_BLOCKS: BlockTemplate[] = [
   loopAnimertForvrengning(),
   lagstabelMal(),
   smudgeGlass(),
+  glassBlob(),
 ]

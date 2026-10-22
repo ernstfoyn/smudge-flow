@@ -73,12 +73,14 @@ export function createEdge(
 }
 
 /**
- * Port-kompatibilitet. Bevisst konservativ: bare identisk type (eller
- * 'drawable' → 'canvas') er tillatt. Alt annet krever en eksplisitt bro-node.
+ * Port-kompatibilitet. Bevisst konservativ, med ett unntak:
+ * «drawable» godtar alt som kan tegnes — lerret, bilde og video.
  */
 export function canConnectTypes(source: ValueType, target: ValueType): boolean {
   if (source === target) return true
-  return source === 'drawable' && target === 'canvas'
+  if (target === 'drawable') return source === 'canvas' || source === 'drawable'
+  if (source === 'drawable' && target === 'canvas') return true
+  return false
 }
 
 /** Finner port-definisjonen for en kant. */

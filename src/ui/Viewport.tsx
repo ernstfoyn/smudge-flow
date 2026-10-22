@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGraphStore } from '../state/useGraphStore'
 import { usePlaybackStore } from '../state/usePlaybackStore'
-import { evaluator, renderServices } from '../state/studio'
+import { evaluator, lastOutputs, renderServices } from '../state/studio'
 import { registry } from '../nodes'
 
 /**
@@ -83,6 +83,9 @@ export function Viewport() {
       try {
         const outputs = await evaluator.evaluateFrame(current, frame, [target.id])
         if (!alive || token !== state.current.token) return
+
+        // Behold resultatet, så UI-en kan vise det (maleputen).
+        for (const [id, output] of outputs) lastOutputs.set(id, output)
 
         const source = outputs.get(target.id)?.frame as CanvasImageSource | undefined
         const ctx = canvas.getContext('2d')!

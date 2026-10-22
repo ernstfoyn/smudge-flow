@@ -47,13 +47,13 @@ med tester som sammenligner gammel og ny implementasjon.
 | `src/vendor/mediabunny.js` | ✅ kopiert uendret til `src/export/vendor/` | MPL-2.0, beholdes med header |
 | `src/scene/BlendStage.jsx` | ✅ portet til `src/nodes/composite/blend.ts` | — |
 | `src/scene/Stage.jsx` | 🟡 delvis | blir `ui/Viewport.tsx` + `render/RenderServices.ts` |
-| `src/scene/BlobView.jsx` | ⬜ neste runde | `source.blob3D` |
-| `src/shaders/fragment.glsl.js` | ⬜ neste runde | `modifier.smudgeMaterial` → én node per look |
-| `src/shaders/vertex.glsl.js` | ⬜ fase 7 | samme |
-| `src/shaders/blob.glsl.js` | ⬜ fase 7 | `source.blob3D` |
-| `src/shaders/noise.glsl.js` | ⬜ fase 7 | deles som GLSL-chunks |
-| `src/trail/trailTexture.js` | ⬜ neste runde | blir `modifier.trail` med stamp-liste |
-| `src/utils/sampleTexture.js` | ⬜ fase 7 | `render/raster/sampleTexture.ts` |
+| `src/scene/BlobView.jsx` | ✅ portet | `source.blob3D` |
+| `src/shaders/fragment.glsl.js` | ✅ delt | `modifier.smudgeDeform` (grunnmateriale) + 16 `modifier.look.*` |
+| `src/shaders/vertex.glsl.js` | ✅ portet | `render/shaders/smudgeVertex.glsl.ts` |
+| `src/shaders/noise.glsl.js` | ✅ portet | `render/shaders/noise.glsl.ts` (kopiert ordrett) |
+| `src/trail/trailTexture.js` | ✅ portet | `modifier.trail` — stemplene lagres som data, ikke som lerret-tilstand |
+| `src/shaders/blob.glsl.js` | ✅ portet | `source.blob3D` |
+| `src/utils/sampleTexture.js` | ⬜ neste runde | `render/raster/sampleTexture.ts` |
 | `src/store/useStore.js` | ✅ splittet | params → node-skjema; anim → `tracks`/`lfo`; render → `graph.settings` |
 | `src/components/Timeline.jsx` | ✅ splittet | `ui/panels/Timeline.tsx` |
 
