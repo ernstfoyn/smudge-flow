@@ -60,6 +60,8 @@ export type ParamType =
   | 'text'
   /** En liste med egne widgets (f.eks. malte stempler). */
   | 'stamps'
+  /** En fil — leses inn som data-URL. */
+  | 'file'
 
 export interface ParamDef {
   /** Støtter punktsti, f.eks. "transform.position.x". */

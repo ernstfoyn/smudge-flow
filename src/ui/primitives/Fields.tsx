@@ -172,6 +172,15 @@ export function ParamField({
       return (
         <CheckField label={def.label} value={!!value} onChange={onChange} disabled={disabled} />
       )
+    case 'file':
+      return (
+        <TextField
+          label={def.label}
+          value={String(value ?? '')}
+          onChange={onChange}
+          disabled={disabled}
+        />
+      )
     case 'text':
     default:
       return (

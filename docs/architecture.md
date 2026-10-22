@@ -222,7 +222,30 @@ gjør at effektene kan kobles fritt i hverandre.
 
 ---
 
-## 6. Tidskontrakt
+## 6. Historikk
+
+Historikken er basert på **øyeblikksbilder av grafen**. Den registreres
+automatisk: et abonnement på butikken fanger hver endring, og en
+`describeChange()`-funksjon finner ut *hva* som endret seg.
+
+| Endring | Etikett | Nøkkel (slår sammen) |
+|---|---|---|
+| Noder lagt til/slettet | «Endret grafen» | — |
+| Koblinger | «Endret koblinger» | — |
+| Parametere | «Endret parameter» | `param:<node>:<key>` |
+| Keyframes | «Endret keyframes» | `tracks:<node>` |
+| LFO | «Endret animasjon» | `lfo:<node>` |
+| Posisjon | «Flyttet node» | `move:<node>` |
+
+Nøkkelen gjør at en node som dras, eller en skyveknapp som kjøres over,
+gir **ett** innslag i stedet for hundre.
+
+Historikken har en grense (80 innslag) og tar utgangspunktet som første
+innslag, slik at selv den første endringen kan angres.
+
+---
+
+## 7. Tidskontrakt
 
 | Felt | Betydning |
 |---|---|
@@ -239,7 +262,7 @@ eksporten kan ikke få en hopp.
 
 ---
 
-## 7. Skalering og ytelse
+## 8. Skalering og ytelse
 
 | grep | Hva det løser |
 |---|---|
@@ -255,7 +278,7 @@ brukes til lerret- og cache-nøkler.
 
 ---
 
-## 8. Kontrakter
+## 9. Kontrakter
 
 ### NodeDefinition
 
@@ -296,7 +319,7 @@ senere flyttes til en egen pakke.
 
 ---
 
-## 9. Eksport
+## 10. Eksport
 
 `src/export/exportGraph.ts` kjører SAMME `evaluator.evaluateFrame()` som
 forhåndsvisningen, men itererer `frame = 0..N-1` uten rAF. Hver frame tegnes
@@ -312,7 +335,7 @@ forhåndsvisningen er nedskalert til.
 
 ---
 
-## 10. Feil håndtert
+## 11. Feil håndtert
 
 | Feil | Hvor | Melding |
 |---|---|---|
@@ -328,7 +351,7 @@ får en rød prikk.
 
 ---
 
-## 11. Roadmap
+## 12. Roadmap
 
 | Fase | Innhold | Status |
 |---|---|---|
@@ -345,6 +368,8 @@ får en rød prikk.
 | 7e | **Smudge-shaderne delt** (grunnmateriale + 16 effektnoder) | ✅ |
 | 7f | **Trail-laget som stempel-data** | ✅ |
 | 7g | **Blob-mode** (`source.blob3D`) | ✅ |
+| 7h | **Undo/redo** | ✅ |
+| 7i | **OBJ-import** (`source.obj`) | ✅ |
 | 8 | Scene-editor (lag, 3D-kamera, tekst), undo/redo | ⬜ |
 | 9 | Rydd: slett `src/legacy/`, flytt `src/engine` til `packages/engine` | ⬜ |
 
@@ -365,7 +390,6 @@ samme resultat ved hver eksport.
 
 - **Scene-editor**: lag med 2D- og 3D-objekter, 3D-kamera som en node,
   tekst som 3D-geometri (`text-mesh.js` er allerede port-klar).
-- **Undo/redo** (`history.js` er allerede port-klar): signatur-baserte
-  snapshots som middleware i store-en.
-- **OBB / tekstur-sampling** (`sampleTexture.js`) som egne noder.
-- **Objekt-import** (`obj-import.js`) som `source.mesh3D`.
+- **Tekst som 3D-geometri** (`text-mesh.js` er port-klar).
+- **Tekstur-sampling** (`sampleTexture.js`) som egne noder.
+- **Scene-editor**: lag med 2D- og 3D-objekter, 3D-kamera som en node.

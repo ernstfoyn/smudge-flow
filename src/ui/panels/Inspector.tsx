@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { registry } from '../../nodes'
 import type { Graph, GraphNode } from '../../engine/types'
 import { nodeParamDefs, nodePorts } from '../../engine/graph'
@@ -6,6 +7,51 @@ import { usePlaybackStore } from '../../state/usePlaybackStore'
 import { ParamField } from '../primitives/Fields'
 import { TrailPad } from './TrailPad'
 import { WAVEFORMS } from '../../engine/animation/lfo'
+
+/** Filvelger som leser filen inn som data-URL. */
+function FileField({
+  label,
+  value,
+  filename,
+  onChange,
+}: {
+  label: string
+  value: string
+  filename: string
+  onChange: (dataUrl: string, filename: string) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-28 shrink-0 text-[11px] uppercase tracking-wide text-zinc-400">{label}</span>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".obj,text/plain"
+        className="hidden"
+        onChange={async (event) => {
+          const file = event.target.files?.[0]
+          if (!file) return
+          const reader = new FileReader()
+          reader.onload = () => onChange(String(reader.result ?? ''), file.name)
+          reader.readAsDataURL(file)
+          event.target.value = ''
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+      >
+        Velg fil
+      </button>
+      <span className="min-w-0 flex-1 truncate text-[10px] text-zinc-500">
+        {filename || (value ? 'innlastet' : 'ingen fil')}
+      </span>
+    </div>
+  )
+}
 
 /** Tittel på en node, ut fra grafen. */
 function nodeTitle(graph: Graph, id: string): string {
@@ -434,12 +480,24 @@ export function Inspector() {
           <div key={p.key} className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
               <div className="flex-1">
-                <ParamField
-                  def={p}
-                  value={value}
-                  disabled={node.enabled === false}
-                  onChange={(v) => setParam(node.id, p.key, v)}
-                />
+                {p.type === 'file' ? (
+                  <FileField
+                    label={p.label}
+                    value={String(value ?? '')}
+                    filename={String(node.params.filename ?? '')}
+                    onChange={(dataUrl, filename) => {
+                      setParam(node.id, p.key, dataUrl)
+                      setParam(node.id, 'filename', filename)
+                    }}
+                  />
+                ) : (
+                  <ParamField
+                    def={p}
+                    value={value}
+                    disabled={node.enabled === false}
+                    onChange={(v) => setParam(node.id, p.key, v)}
+                  />
+                )}
               </div>
 
               {p.animatable && (

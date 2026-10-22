@@ -18,6 +18,7 @@ import { useLibraryStore } from './useLibraryStore'
 import type { BlockTemplate } from '../blocks/types'
 import type { TrailStamp } from '../nodes/modifier/trail'
 import { defaultGraph, makeNode } from './defaultGraph'
+import { EditHistory } from './history'
 
 interface GraphState {
   graph: Graph
@@ -28,6 +29,12 @@ interface GraphState {
   selectedEdges: string[]
   /** Kort melding om siste kobling (feil eller info). */
   notice: string | null
+  /** Kan angres / gjøres om? */
+  canUndo: boolean
+  canRedo: boolean
+  /** Etikett på neste angres. */
+  undoLabel: string | null
+  redoLabel: string | null
 
   setGraph: (graph: Graph) => void
   addNode: (type: string, position: { x: number; y: number }) => NodeId | null
@@ -73,6 +80,12 @@ interface GraphState {
   setLfo: (id: NodeId, path: string, patch: Partial<LfoConfig>) => void
 
   setSettings: (patch: Partial<GraphSettings>) => void
+  /** Tar ett steg tilbake i endringene. */
+  undo: () => void
+  /** Tar ett steg fram i endringene. */
+  redo: () => void
+  /** Tømmer historikken. */
+  clearHistory: () => void
   select: (id: NodeId | null) => void
   setSelection: (ids: NodeId[]) => void
   /** Legger til/fjerner en node i markeringen (multi-selektering). */
@@ -106,12 +119,60 @@ function removeFromSubgraph(node: GraphNode, id: NodeId): GraphNode {
   return { ...node, group }
 }
 
+const history = new EditHistory(80)
+
+/** True mens en historikkoppføring settes i grafen (skal ikke registreres). */
+let applyingHistory = false
+
+/**
+ * Beskriver hva som endret seg, slik at historikken får gode etiketter
+ * og raske endringer kan slås sammen.
+ */
+function describeChange(
+  prev: Graph,
+  next: Graph,
+): { label: string; key?: string } | null {
+  const prevNodes = new Map(prev.nodes.map((n) => [n.id, n]))
+  const nextNodes = new Map(next.nodes.map((n) => [n.id, n]))
+
+  if (nextNodes.size !== prevNodes.size) return { label: 'Endret grafen' }
+  if (next.edges.length !== prev.edges.length) return { label: 'Endret koblinger' }
+
+  for (const [id, node] of nextNodes) {
+    const before = prevNodes.get(id)
+    if (!before) return { label: 'Endret grafen' }
+
+    if (JSON.stringify(before.params) !== JSON.stringify(node.params)) {
+      const key = Object.keys(node.params).find(
+        (k) => JSON.stringify(before.params[k]) !== JSON.stringify(node.params[k]),
+      )
+      return { label: 'Endret parameter', key: `param:${id}:${key}` }
+    }
+    if (JSON.stringify(before.tracks) !== JSON.stringify(node.tracks)) {
+      return { label: 'Endret keyframes', key: `tracks:${id}` }
+    }
+    if (JSON.stringify(before.lfo) !== JSON.stringify(node.lfo)) {
+      return { label: 'Endret animasjon', key: `lfo:${id}` }
+    }
+    if (before.position.x !== node.position.x || before.position.y !== node.position.y) {
+      return { label: 'Flyttet node', key: `move:${id}` }
+    }
+    if (before.title !== node.title) return { label: 'Omdøpte node', key: `title:${id}` }
+  }
+
+  return null
+}
+
 export const useGraphStore = create<GraphState>((set, get) => ({
   graph: defaultGraph(),
   selected: null,
   selection: [],
   selectedEdges: [],
   notice: null,
+  canUndo: false,
+  canRedo: false,
+  undoLabel: null,
+  redoLabel: null,
 
   setGraph: (graph) => set({ graph }),
 
@@ -675,6 +736,56 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   setSettings: (patch) =>
     set((s) => ({ graph: { ...s.graph, settings: { ...s.graph.settings, ...patch } } })),
 
+  /**
+   * Tar ett steg tilbake i endringene.
+   *
+   * Historikken er basert på øyeblikksbilder av grafen, så angres
+   * gjenoppretter noder, koblinger, parametere og keyframes på én gang.
+   */
+  undo: () => {
+    const graph = history.undo()
+    if (!graph) return
+    applyingHistory = true
+    set({
+      graph: structuredClone(graph),
+      selected: null,
+      selection: [],
+      selectedEdges: [],
+    })
+    applyingHistory = false
+    set({
+      canUndo: history.canUndo,
+      canRedo: history.canRedo,
+      undoLabel: history.undoLabel,
+      redoLabel: history.redoLabel,
+    })
+  },
+
+  /** Tar ett steg fram i endringene. */
+  redo: () => {
+    const graph = history.redo()
+    if (!graph) return
+    applyingHistory = true
+    set({
+      graph: structuredClone(graph),
+      selected: null,
+      selection: [],
+      selectedEdges: [],
+    })
+    applyingHistory = false
+    set({
+      canUndo: history.canUndo,
+      canRedo: history.canRedo,
+      undoLabel: history.undoLabel,
+      redoLabel: history.redoLabel,
+    })
+  },
+
+  clearHistory: () => {
+    history.clear()
+    set({ canUndo: false, canRedo: false, undoLabel: null, redoLabel: null })
+  },
+
   select: (selected) => set({ selected, selection: selected ? [selected] : [] }),
 
   setSelection: (selection) => set({ selection, selected: selection[selection.length - 1] ?? null }),
@@ -694,3 +805,22 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   reset: () => set({ graph: defaultGraph(), selected: null }),
 }))
+
+// Alle endringer i grafen registreres i historikken automatisk.
+// Et abonnement fanger hver endring, og endringen beskrives med en etikett.
+// Raske endringer med samme nøkkel (dragging, skyveknapper) slås sammen.
+useGraphStore.subscribe((state, prev) => {
+  if (state.graph === prev.graph) return
+  if (applyingHistory) return
+
+  const change = describeChange(prev.graph, state.graph)
+  if (!change) return
+
+  history.recordChange(prev.graph, state.graph, change.label, change.key)
+  useGraphStore.setState({
+    canUndo: history.canUndo,
+    canRedo: history.canRedo,
+    undoLabel: history.undoLabel,
+    redoLabel: history.redoLabel,
+  })
+})

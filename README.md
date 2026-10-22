@@ -65,6 +65,7 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `source.loop` | kilde | Ny — løkkesikre verdier fra loop-algoritmer |
 | `source.mesh3D` | kilde | Ny — prosedural 3D-geometri (boks/kule/torus/plan/sylinder/ikosaeder) |
 | `source.blob3D` | kilde | Smudge `blob.glsl.js` — raymarchet metaball-form |
+| `source.obj` | kilde | Orbit `obj-import.js` — importerte 3D-modeller |
 | `modifier.transform2D` | modifikator | Ny, erstatter Smudges 3D-transform |
 | `modifier.transform3D` | modifikator | Ny — flytter/roterer 3D-objekter |
 | `modifier.trail` | modifikator | Smudge `trailTexture.js` — malte stempler, lagret som data |
@@ -177,6 +178,37 @@ Den kobles naturlig etter trail-laget, så du kan male inn i formen:
 ```
 bilde ─▶ modifier.trail ─▶ source.blob3D ─▶ modifier.look.chromatic ─▶ viewport
 ```
+
+---
+
+## Angre og gjøre om
+
+Alt som endrer grafen, registreres i historikken: noder, koblinger,
+parametere, keyframes, LFO, blokker og malte stempler.
+
+- **Cmd/Ctrl + Z** — angrer
+- **Cmd/Ctrl + Shift + Z** — gjør om
+- Knappene **↶** og **↷** i topplinja viser hva som angres
+
+Raske endringer slås sammen: å dra en node, eller å dra en skyveknapp over
+flere verdier, gir **ett** innslag i historikken — ikke hundre.
+
+Historikken tar utgangspunkt i grafen slik den var, så selv den første
+endringen kan angres.
+
+---
+
+## OBJ-import
+
+`source.obj` importerer 3D-modeller. Filen lagres som data-URL i noden, så
+modellen blir en del av grafen — den kan kopieres, lagres og deles.
+
+Velg filen i inspectoren, og koble modellen til `3D-transform` og
+`3D-scene` som en hvilken som helst annen 3D-kilde.
+
+Parseren er portet ordrett fra den gamle appen (med ear clipping for
+koncave flater), og er dekket av en paritetstest som sammenligner
+resultatet med originalen.
 
 ---
 

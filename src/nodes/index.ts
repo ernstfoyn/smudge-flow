@@ -5,6 +5,7 @@ import { imageSource } from './source/imageSource'
 import { loopSource } from './source/loopSource'
 import { mesh3D } from './source/mesh3D'
 import { blob3D } from './source/blob3D'
+import { objSource } from './source/objSource'
 import { transform2D } from './modifier/transform2D'
 import { smudgeDeform } from './modifier/smudgeDeform'
 import { lookNodes } from './modifier/lookNodes'
@@ -31,6 +32,7 @@ export const registry = new NodeRegistry().registerAll([
   loopSource,
   mesh3D,
   blob3D,
+  objSource,
   // Modifikatorer
   transform2D,
   smudgeDeform,

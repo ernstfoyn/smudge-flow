@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FlowCanvas } from './ui/FlowCanvas'
 import { Viewport } from './ui/Viewport'
 import { NodePalette } from './ui/panels/NodePalette'
@@ -23,6 +23,34 @@ export default function App() {
   const clearNotice = useGraphStore((s) => s.clearNotice)
   const toggle = usePlaybackStore((s) => s.toggle)
   const isPlaying = usePlaybackStore((s) => s.isPlaying)
+  const undo = useGraphStore((s) => s.undo)
+  const redo = useGraphStore((s) => s.redo)
+  const canUndo = useGraphStore((s) => s.canUndo)
+  const canRedo = useGraphStore((s) => s.canRedo)
+  const undoLabel = useGraphStore((s) => s.undoLabel)
+  const redoLabel = useGraphStore((s) => s.redoLabel)
+
+  // Cmd/Ctrl+Z angrer, Cmd/Ctrl+Shift+Z gjør om.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const meta = event.metaKey || event.ctrlKey
+      if (!meta) return
+      const key = event.key.toLowerCase()
+      if (key !== 'z' && key !== 'y') return
+
+      const target = event.target as HTMLElement | null
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
+        return
+      }
+
+      event.preventDefault()
+      if (key === 'y' || event.shiftKey) redo()
+      else undo()
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [undo, redo])
 
   const save = () => {
     const blob = new Blob([serializeGraph(graph)], { type: 'application/json' })
@@ -61,6 +89,24 @@ export default function App() {
         </span>
 
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={undo}
+            disabled={!canUndo}
+            title={undoLabel ? `Angre: ${undoLabel} (Cmd+Z)` : 'Ingenting å angre'}
+            className="rounded border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800 disabled:opacity-30"
+          >
+            ↶
+          </button>
+          <button
+            type="button"
+            onClick={redo}
+            disabled={!canRedo}
+            title={redoLabel ? `Gjør om: ${redoLabel} (Cmd+Shift+Z)` : 'Ingenting å gjøre om'}
+            className="rounded border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800 disabled:opacity-30"
+          >
+            ↷
+          </button>
           <button
             type="button"
             onClick={toggle}

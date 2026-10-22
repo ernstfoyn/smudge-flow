@@ -20,10 +20,10 @@ med tester som sammenligner gammel og ny implementasjon.
 | `motion-graphics.js` | `src/render/raster/motionGraphics.ts` | ✅ portet | `tests/parity/gradient.parity.test.ts` |
 | `compositor.js` (raster) | `src/render/raster/raster.ts` | ✅ portet | ⬜ mangler maskinell test (krever canvas) |
 | `surface.js` | — | ⬜ fase 7 | — |
-| `obj-import.js` | — | ⬜ fase 7 | — |
+| `obj-import.js` | ✅ portet | `source.obj` (paritetstest mot originalen) |
 | `text-mesh.js` | — | ⬜ fase 7 | — |
 | `group-shader.js` | — | ⬜ fase 7 | — |
-| `history.js` | — | ⬜ fase 7 (undo/redo) | — |
+| `history.js` | ✅ portet | `state/history.ts` — historikk for grafen |
 | `video-export.js` | `src/export/encodeFrames.ts` | ✅ portet | ✅ verifisert i nettleser |
 | `sketch.js` (1110 l) | `src/nodes/…` + `src/render/…` | 🟡 delvis | se under |
 
