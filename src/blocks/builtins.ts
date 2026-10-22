@@ -109,10 +109,45 @@ function lagstabelMal(): BlockTemplate {
   )
 }
 
+function smudgeGlass(): BlockTemplate {
+  const b = new TemplateBuilder()
+  const smudge = b.node(
+    'modifier.smudgeDeform',
+    {
+      trailCount: 5,
+      trailSpread: 0.55,
+      trailSwirl: 0.5,
+      twist: 3,
+      pull: 2.5,
+      octaves: 4,
+      hue: 0,
+      saturation: 1,
+      gloss: 1,
+    },
+    { x: 0, y: 0 },
+  )
+  const chromatic = b.node('modifier.look.chromatic', { amount: 0.6 }, { x: 260, y: 0 })
+  const vhs = b.node('modifier.look.vhs', { amount: 0.35 }, { x: 480, y: 0 })
+
+  b.connect(smudge, 'out', chromatic, 'in')
+  b.connect(chromatic, 'out', vhs, 'in')
+  b.exposeInput(smudge, 'in', 'Bilde')
+  b.exposeOutput(vhs, 'out', 'Glass')
+
+  return withDefaultSources(
+    b.build(
+      'Smudge-glass',
+      'Flytende glass-effekt med trail, kromatisk spalting og VHS-linjer.',
+      'Behandling',
+    ),
+  )
+}
+
 export const BUILTIN_BLOCKS: BlockTemplate[] = [
   generativeBakgrunn(),
   rasterBehandling(),
   treDForm(),
   loopAnimertForvrengning(),
   lagstabelMal(),
+  smudgeGlass(),
 ]

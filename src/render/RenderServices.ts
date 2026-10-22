@@ -1,4 +1,5 @@
-import type { CanvasTarget, RenderServices } from '../engine/types'
+import type { CanvasTarget, PostOptions, RenderServices } from '../engine/types'
+import type { PostProcess } from './three/postProcess'
 
 /**
  * Eneste sted som eier DOM/canvas-ressurser.
@@ -12,6 +13,10 @@ export class BrowserRenderServices implements RenderServices {
   private videos = new Map<string, HTMLVideoElement>()
   /** Versjon per lerret — brukes til memo i motoren. */
   private versions = new WeakMap<object, number>()
+  /** Delt GPU-kontekst for alle postprosesseringer. */
+  private postProcess: PostProcess | null = null
+  /** three.js lastes først når en effekt faktisk brukes. */
+  private postModule: Promise<typeof import('./three/postProcess')> | null = null
 
   constructor(
     public width: number,
@@ -99,7 +104,29 @@ export class BrowserRenderServices implements RenderServices {
     },
   }
 
+  /**
+   * Fullskjerm-postprosessering.
+   *
+   * Alle effektnoder deler én WebGL-kontekst. Nettleserne begrenser
+   * antallet levende kontekster, så dette må ikke lages per node.
+   */
+  async post(input: CanvasImageSource, options: PostOptions): Promise<HTMLCanvasElement> {
+    if (!this.postModule) {
+      this.postModule = import('./three/postProcess')
+    }
+    const { PostProcess } = await this.postModule
+
+    if (!this.postProcess) {
+      this.postProcess = new PostProcess(this.width, this.height)
+    } else {
+      this.postProcess.resize(this.width, this.height)
+    }
+    return this.postProcess.render(input, options)
+  }
+
   dispose(): void {
     this.canvases.clear()
+    this.postProcess?.dispose()
+    this.postProcess = null
   }
 }

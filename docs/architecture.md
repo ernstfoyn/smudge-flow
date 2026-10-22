@@ -187,7 +187,42 @@ parameterkoblingen teller som en avhengighet i den topologiske sorteringen.
 
 ---
 
-## 5. Tidskontrakt
+## 5. Shader-splittet
+
+Den gamle `fragment.glsl.js` var én monolitisk shader med 16 stilistiske
+effekter i en løkke over `uLookOrder`. Nå er de delt:
+
+| Del | Fil | Node |
+|---|---|---|
+| Støybibliotek | `render/shaders/noise.glsl.ts` | (deles) |
+| Vertex-shader | `render/shaders/smudgeVertex.glsl.ts` | `modifier.smudgeDeform` |
+| Fragment-shader | `render/shaders/smudgeFragment.glsl.ts` | `modifier.smudgeDeform` |
+| 16 effekter | `render/shaders/looks.ts` | `modifier.look.*` |
+
+**Grunnmaterialet** (`modifier.smudgeDeform`) har beholdt trailen av
+ekko-kopier, hue/metning, fresnel-rand og glans. Det er vertex-normalene
+som gjør at den trenger en 3D-renderer.
+
+**Effektene** er egne noder. Hver har `amount` og `scale`, og kobles i
+grafen som alt annet. Rekkefølgen bestemmes av kantene — ikke av en array.
+
+### Tekniske grep
+
+| Grep | Hvorfor |
+|---|---|
+| Effektkoden blir *kroppen* i `applyLook()` | Effektene får `bl`, `pw`, `sc` og `dir` akkurat som i den gamle loopen |
+| ÉN delt WebGL-kontekst for alle effekter | Nettleserne begrenser antallet kontekster; 16 effekt-noder kan ikke ha hver sin |
+| Materialer caches per GLOW-kode | Hver effekt kompileres bare én gang |
+| `three.js` lastes dynamisk | Hovedpakken holder seg på ~157 kB gzip |
+| Tiden kommer fra `ctx.phase` | Effektene lukker seg eksakt med loopen |
+
+Effektene sampler fra *passens eget input-lerret* (ikke fra kildeteksturen
+slik som i originalen). Det er den naturlige semantikken i en nodegraf, og
+gjør at effektene kan kobles fritt i hverandre.
+
+---
+
+## 6. Tidskontrakt
 
 | Felt | Betydning |
 |---|---|
@@ -204,7 +239,7 @@ eksporten kan ikke få en hopp.
 
 ---
 
-## 6. Skalering og ytelse
+## 7. Skalering og ytelse
 
 | grep | Hva det løser |
 |---|---|
@@ -220,7 +255,7 @@ brukes til lerret- og cache-nøkler.
 
 ---
 
-## 7. Kontrakter
+## 8. Kontrakter
 
 ### NodeDefinition
 
@@ -261,7 +296,7 @@ senere flyttes til en egen pakke.
 
 ---
 
-## 8. Eksport
+## 9. Eksport
 
 `src/export/exportGraph.ts` kjører SAMME `evaluator.evaluateFrame()` som
 forhåndsvisningen, men itererer `frame = 0..N-1` uten rAF. Hver frame tegnes
@@ -277,7 +312,7 @@ forhåndsvisningen er nedskalert til.
 
 ---
 
-## 9. Feil håndtert
+## 10. Feil håndtert
 
 | Feil | Hvor | Melding |
 |---|---|---|
@@ -293,7 +328,7 @@ får en rød prikk.
 
 ---
 
-## 10. Roadmap
+## 11. Roadmap
 
 | Fase | Innhold | Status |
 |---|---|---|
@@ -307,7 +342,8 @@ får en rød prikk.
 | 7b | **Parameter-koblinger** | ✅ |
 | 7c | **Loop-generator** | ✅ |
 | 7d | **3D: mesh3D, transform3D, sceneRender** | ✅ |
-| 7e | Smudge-shaderne (fragment/vertex), trail som stamp-liste | ⬜ |
+| 7e | **Smudge-shaderne delt** (grunnmateriale + 16 effektnoder) | ✅ |
+| 7f | Trail-penselen som stamp-liste | ⬜ |
 | 8 | Scene-editor (lag, 3D-kamera, tekst), undo/redo | ⬜ |
 | 9 | Rydd: slett `src/legacy/`, flytt `src/engine` til `packages/engine` | ⬜ |
 

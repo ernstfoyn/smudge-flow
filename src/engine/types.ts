@@ -183,6 +183,17 @@ export interface CanvasTarget {
   version: number
 }
 
+export interface PostOptions {
+  /** GLOW-koden for effekten. */
+  glsl: string
+  /** Styrke 0..2. */
+  amount: number
+  /** Skala/frekvens 0..1. */
+  scale: number
+  /** Animert tid, i sekunder. */
+  time: number
+}
+
 export interface RenderServices {
   readonly width: number
   readonly height: number
@@ -192,6 +203,11 @@ export interface RenderServices {
   touch(key: string): void
   /** Versjonen av en verdi (0 for verdier som ikke er lerret). */
   versionOf(value: unknown): number
+  /**
+   * Fullskjerm-postprosessering av et raster-lerret.
+   * Alle effektnoder deler én GPU-kontekst gjennom denne.
+   */
+  post(input: CanvasImageSource, options: PostOptions): Promise<HTMLCanvasElement>
   assets: {
     image(src: string): Promise<HTMLImageElement>
     /** Deterministisk: seeker og venter på 'seeked' per frame. */

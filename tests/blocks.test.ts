@@ -50,6 +50,9 @@ function fakeRender(): RenderServices {
     },
     touch: () => {},
     versionOf: () => 0,
+    post: async () => {
+      throw new Error('Ikke støttet i test')
+    },
     assets: {
       image: async () => {
         throw new Error('Ikke støttet i test')

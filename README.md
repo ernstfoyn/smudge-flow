@@ -66,6 +66,8 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `source.mesh3D` | kilde | Ny — prosedural 3D-geometri (boks/kule/torus/plan/sylinder/ikosaeder) |
 | `modifier.transform2D` | modifikator | Ny, erstatter Smudges 3D-transform |
 | `modifier.transform3D` | modifikator | Ny — flytter/roterer 3D-objekter |
+| `modifier.smudgeDeform` | modifikator | Smudge `vertex/fragment.glsl.js` — flytende glass, trail, glans |
+| `modifier.look.*` (16 stk) | modifikator | Smudge `fragment.glsl.js` — hver effekt sin node |
 | `modifier.raster` | modifikator | Orbit `compositor.js` (luminansraster) |
 | `modifier.blur` | modifikator | Orbit `image-effects.js` |
 | `modifier.pixelate` | modifikator | Orbit `image-effects.js` |
@@ -123,6 +125,25 @@ source.loop ──value──▶ modifier.raster.param:cellSize
 
 Algoritmer: sine, trekant, sag, firkant og løkkesikker støy. Vindu
 `pingpong` eller `cosine` former kurven slik at den starter og slutter likt.
+
+---
+
+## Smudge-materialet og effektene
+
+Den gamle `fragment.glsl.js` var én monolitisk shader med 16 effekter i en
+løkke. Nå er de delt:
+
+- **`modifier.smudgeDeform`** — flytende glass-effekten. Forskyver bildet i 3D
+  etter et støyfelt (twist/pull), bygger en trail av ekko-kopier, og legger på
+  hue, fresnel-rand og glans.
+- **16 effektnoder** (`modifier.look.chromatic`, `.rainbow`, `.halftone`,
+  `.pixelate`, `.lens`, `.ripple`, `.glitch`, `.posterize`, `.vignette`,
+  `.dither`, `.duotone`, `.scanlines`, `.zoomBlur`, `.vhs`, `.spherize`,
+  `.fletedGlass`) — hver med `amount` og `scale`.
+
+**Rekkefølgen bestemmes av kantene i grafen.** Koble Kromatisk før VHS, så
+får du VHS-en på det kromatisk-splittede bildet — og bytter du om, får du
+det andre resultatet.
 
 ---
 
