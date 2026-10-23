@@ -10,11 +10,13 @@ import { objSource } from './source/objSource'
 import { noise } from './source/noise'
 import { voronoi } from './source/voronoi'
 import { transform2D } from './modifier/transform2D'
+import { motion2D } from './modifier/motion2D'
 import { smudgeDeform } from './modifier/smudgeDeform'
 import { lookNodes } from './modifier/lookNodes'
 import { trail } from './modifier/trail'
 import { scatter3D } from './modifier/scatter3D'
 import { transform3D } from './modifier/transform3D'
+import { motion3D } from './modifier/motion3D'
 import { raster } from './modifier/raster'
 import { blurNode, pixelateNode, warpNode } from './modifier/pixelNodes'
 import { grade } from './modifier/grade'
@@ -49,10 +51,12 @@ export const registry = new NodeRegistry().registerAll([
   voronoi,
   // Modifikatorer
   transform2D,
+  motion2D,
   smudgeDeform,
   trail,
   ...lookNodes,
   transform3D,
+  motion3D,
   scatter3D,
   raster,
   blurNode,

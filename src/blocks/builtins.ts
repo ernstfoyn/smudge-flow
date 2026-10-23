@@ -98,6 +98,25 @@ function loopAnimertForvrengning(): BlockTemplate {
   )
 }
 
+function bevegeligBilde(): BlockTemplate {
+  const b = new TemplateBuilder()
+  const motion = b.node(
+    'modifier.motion2D',
+    { preset: 'float', amplitude: 80, cycles: 1 },
+    { x: 0, y: 0 },
+  )
+  b.exposeInput(motion, 'in', 'Bilde')
+  b.exposeOutput(motion, 'out', 'Bevegelig bilde')
+
+  return withDefaultSources(
+    b.build(
+      'Bevegelig bilde',
+      'Svevende bilde med løkkesikker bevegelse. Bytt preset i Objektbevegelse-noden.',
+      'Behandling',
+    ),
+  )
+}
+
 function lagstabelMal(): BlockTemplate {
   const b = new TemplateBuilder()
   const stack = b.node('composite.stack', { mode: 'screen', opacity: 0.9 }, { x: 0, y: 0 })
@@ -271,6 +290,38 @@ function treDGruppe(): BlockTemplate {
   )
 }
 
+function treDAnimasjon(): BlockTemplate {
+  const b = new TemplateBuilder()
+  const scatter = b.node(
+    'modifier.scatter3D',
+    { pattern: 'ring', count: 8, radius: 1.2, wave: 0.2, waveTurns: 1, spin: 0 },
+    { x: 0, y: 0 },
+  )
+  const motion = b.node(
+    'modifier.motion3D',
+    { preset: 'orbit', strength: 100, cycles: 1, phaseOffset: 0.15 },
+    { x: 220, y: 0 },
+  )
+  const scene = b.node(
+    'composite.sceneRender',
+    { cameraDistance: 4.5, ambient: 1.2, directional: 2, spin: 0 },
+    { x: 440, y: 0 },
+  )
+
+  b.connect(scatter, 'out', motion, 'in')
+  b.connect(motion, 'out', scene, 'in')
+  b.exposeInput(scatter, 'in', '3D-objekt')
+  b.exposeOutput(scene, 'out', '3D-animasjon')
+
+  return withDefaultSources(
+    b.build(
+      '3D-animasjon',
+      'Åtte objekter i ring med orbit og faseforskyvning. Bytt preset i 3D-animasjonspreset-noden.',
+      '3D',
+    ),
+  )
+}
+
 export const BUILTIN_BLOCKS: BlockTemplate[] = [
   generativeBakgrunn(),
   rasterBehandling(),
@@ -278,7 +329,9 @@ export const BUILTIN_BLOCKS: BlockTemplate[] = [
   treDTekst(),
   treDScene(),
   treDGruppe(),
+  treDAnimasjon(),
   loopAnimertForvrengning(),
+  bevegeligBilde(),
   lagstabelMal(),
   smudgeGlass(),
   glassBlob(),

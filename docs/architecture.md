@@ -55,8 +55,8 @@ på CPU og gjør at 2D og 3D kan sameksistere.
 
 | Domene | Verdityper | Noder |
 |---|---|---|
-| **Raster** | `drawable`, `canvas`, `frame` | gradient, motionGraphics, noise, voronoi, image, transform2D, raster, blur, pixelate, warp, blend, stack, bloom, grade |
-| **3D** | `object3d` | mesh3D, text3D, transform3D, scatter3D, sceneObject, sceneGroup |
+| **Raster** | `drawable`, `canvas`, `frame` | gradient, motionGraphics, noise, voronoi, image, transform2D, motion2D, raster, blur, pixelate, warp, blend, stack, bloom, grade |
+| **3D** | `object3d` | mesh3D, text3D, transform3D, motion3D, scatter3D, sceneObject, sceneGroup |
 | **Bro** | `object3d` → `canvas` | `composite.sceneRender` |
 | **Data** | `number`, `string`, `boolean`, `color` | loop, camera, lights, param-koblinger |
 
@@ -195,6 +195,26 @@ eksporten blir bit-identisk med previewen.
 Vinduet former *fasen* før algoritmen anvendes. Derfor lukker alle
 algoritmer seg eksakt, også støyen (som interpolerer mellom hash-verdier på
 et sirkulært gitter).
+
+### Animasjonspresets (`modifier.motion2D` / `modifier.motion3D`)
+
+De ferdige bevegelsene fra den opprinnelige Smudge/Orbit-appen er egne noder,
+ikke skjulte egenskaper på objektene. Det gjør dem synlige i grafen, og de kan
+kombineres med keyframes og LFO-er uten å overskrive noe.
+
+| Node | Presets | Virkning |
+|---|---|---|
+| `modifier.motion2D` | svev, gli, sirkelbane, vugging, puls, fade | Tegner innholdet på nytt rundt lerretets midtpunkt med en løkkesikker 2D-transform. |
+| `modifier.motion3D` | orbit, bølge, rutenett, spiral, sverm, vuggende rotasjon, puls | Legger en 3D-transform *oppå* objektets egen, så keyframes og hierarki beholdes. |
+
+Begge bruker `ctx.phase` og et heltall antall sykluser per loop. Derfor er
+verdien ved fase 1 identisk med fase 0. `motion3D` har også en startfase og en
+faseforskyvning per objekt. Når inngangen er en gruppe — for eksempel fra
+`modifier.scatter3D` — får hvert toppnivå-barn sin egen bevegelse. Da virker
+spiral/sverm og faseforskyvningen per kopi, som i den gamle cloneren.
+
+Standardblokkene «Bevegelig bilde» og «3D-animasjon» er ferdige kjeder som viser
+begge nodene med et fornuftig utgangspunkt.
 
 ### Parameter-koblinger
 

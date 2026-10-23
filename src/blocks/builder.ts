@@ -189,6 +189,11 @@ const DEFAULT_SOURCES: Record<
   string,
   { type: string; params: Record<string, unknown>; title: string }
 > = {
+  drawable: {
+    type: 'source.gradient',
+    title: 'Standard',
+    params: { fill: 'radial', colorA: '#4a5160', colorB: '#1b1f27' },
+  },
   canvas: {
     type: 'source.gradient',
     title: 'Standard',
