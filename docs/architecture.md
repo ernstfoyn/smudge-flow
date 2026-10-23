@@ -55,10 +55,10 @@ på CPU og gjør at 2D og 3D kan sameksistere.
 
 | Domene | Verdityper | Noder |
 |---|---|---|
-| **Raster** | `drawable`, `canvas`, `frame` | gradient, motionGraphics, image, transform2D, raster, blur, pixelate, warp, blend, stack |
-| **3D** | `object3d` | mesh3D, transform3D |
+| **Raster** | `drawable`, `canvas`, `frame` | gradient, motionGraphics, noise, voronoi, image, transform2D, raster, blur, pixelate, warp, blend, stack, bloom, grade |
+| **3D** | `object3d` | mesh3D, transform3D, scatter3D, sceneObject, sceneGroup |
 | **Bro** | `object3d` → `canvas` | `composite.sceneRender` |
-| **Data** | `number`, `string`, `boolean`, `color` | loop, param-koblinger |
+| **Data** | `number`, `string`, `boolean`, `color` | loop, camera, lights, param-koblinger |
 
 Uten bro-noder må hver node eie en WebGL-kontekst — det er nettopp problemet
 med `Stage.jsx` i den gamle kodebasen. Med broer kan hele DAG-en evalueres på
@@ -198,6 +198,8 @@ effekter i en løkke over `uLookOrder`. Nå er de delt:
 | Vertex-shader | `render/shaders/smudgeVertex.glsl.ts` | `modifier.smudgeDeform` |
 | Fragment-shader | `render/shaders/smudgeFragment.glsl.ts` | `modifier.smudgeDeform` |
 | 16 effekter | `render/shaders/looks.ts` | `modifier.look.*` |
+| Grade + glød | `render/shaders/postFx.ts` | `modifier.grade`, `modifier.bloom` |
+| Støy + celler | `render/shaders/generators.ts` | `source.noise`, `source.voronoi` |
 
 **Grunnmaterialet** (`modifier.smudgeDeform`) har beholdt trailen av
 ekko-kopier, hue/metning, fresnel-rand og glans. Det er vertex-normalene
@@ -219,6 +221,27 @@ grafen som alt annet. Rekkefølgen bestemmes av kantene — ikke av en array.
 Effektene sampler fra *passens eget input-lerret* (ikke fra kildeteksturen
 slik som i originalen). Det er den naturlige semantikken i en nodegraf, og
 gjør at effektene kan kobles fritt i hverandre.
+
+### Lån fra vgpu
+
+[vercel-labs/vgpu](https://github.com/vercel-labs/vgpu) er en WebGPU-runtime,
+ikke et nodebibliotek. Vi har derfor ikke byttet backend (det ville krevd WGSL
+overalt og mistet determinismen i eksporten), men portet enkeltdeler:
+
+| Lån | Fra | Node |
+|---|---|---|
+| Simplex-fBm og domene-warp | `@vgpu/wgsl-std/noise/perlin` | `source.noise` |
+| Voronoi f1/f2/celle-ID | `@vgpu/wgsl-std/noise` | `source.voronoi` |
+| ACES, Reinhard, eksponering | `@vgpu/wgsl-std/color` | `modifier.grade` |
+| Luminansterskel + Vogel-skive | `@vgpu/wgsl-std/color`, `/sampling` | `modifier.bloom` |
+| 15 geometrier | `vgpu/scene` | `source.mesh3D` |
+| Wireframe- og normal-materialer | `vgpu/render/inspect` | materialmodus |
+| Instansmønstre | `instanced-rendering`, `spiral-galaxy` | `modifier.scatter3D` |
+
+**Loop-sikkerheten er vår egen.** Støyen driver i en sirkel i støyrommet og
+morfer mellom to z-snitt med `sin²(π·fase)`; begge er null i enden av loopen.
+Celler og spredning bruker bare sirkulær drift og hele omdreininger. Frame 0 og
+frame N er derfor bit-identiske (verifisert med pikseldiff i nettleseren).
 
 ---
 
@@ -371,6 +394,8 @@ får en rød prikk.
 | 7h | **Undo/redo** | ✅ |
 | 7i | **OBJ-import** (`source.obj`) | ✅ |
 | 7j | **Scenemodellen**: lag per lag, hierarki, kamera og lys som verdier | ✅ |
+| 7k | **Lån fra vgpu**: 3D-former, materialmodus, Grade/Glød | ✅ |
+| 7l | **Lån fra vgpu**: støy, celler og spredning (loop-sikkert) | ✅ |
 | 8 | Tekst som 3D-geometri, scene-import fra gammelt format | ⬜ |
 | 9 | Rydd: slett `src/legacy/`, flytt `src/engine` til `packages/engine` | ⬜ |
 

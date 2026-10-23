@@ -6,10 +6,13 @@ import { loopSource } from './source/loopSource'
 import { mesh3D } from './source/mesh3D'
 import { blob3D } from './source/blob3D'
 import { objSource } from './source/objSource'
+import { noise } from './source/noise'
+import { voronoi } from './source/voronoi'
 import { transform2D } from './modifier/transform2D'
 import { smudgeDeform } from './modifier/smudgeDeform'
 import { lookNodes } from './modifier/lookNodes'
 import { trail } from './modifier/trail'
+import { scatter3D } from './modifier/scatter3D'
 import { transform3D } from './modifier/transform3D'
 import { raster } from './modifier/raster'
 import { blurNode, pixelateNode, warpNode } from './modifier/pixelNodes'
@@ -39,12 +42,15 @@ export const registry = new NodeRegistry().registerAll([
   mesh3D,
   blob3D,
   objSource,
+  noise,
+  voronoi,
   // Modifikatorer
   transform2D,
   smudgeDeform,
   trail,
   ...lookNodes,
   transform3D,
+  scatter3D,
   raster,
   blurNode,
   pixelateNode,
