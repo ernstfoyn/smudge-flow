@@ -1,9 +1,10 @@
 import { create } from 'zustand'
-import type { Graph, GraphNode, GraphSettings, Keyframe, LfoConfig, NodeId } from '../engine/types'
+import type { Graph, GraphEdge, GraphNode, GraphSettings, Keyframe, LfoConfig, NodeId } from '../engine/types'
 import {
   PARAM_PORT_PREFIX,
   canConnectTypes,
   createGroupFromSelection,
+  createNode,
   explodeGroup,
   findPort,
   nodeParamDefs,
@@ -71,6 +72,8 @@ interface GraphState {
   disconnectGroupEdge: (groupId: NodeId, edgeId: string) => void
   /** Setter en blokk fra biblioteket inn i grafen. */
   insertBlock: (template: BlockTemplate, position?: { x: number; y: number }) => NodeId | null
+  /** Erstatter hele nodetreet med en blokk og en viewport. */
+  replaceWithBlock: (template: BlockTemplate) => NodeId | null
   /** Lagrer markerte noder som en blokk i biblioteket. */
   saveSelectionAsBlock: (name: string, description?: string) => BlockTemplate | null
 
@@ -120,6 +123,34 @@ function removeFromSubgraph(node: GraphNode, id: NodeId): GraphNode {
   }
 
   return { ...node, group }
+}
+
+/**
+ * Lager en gruppe-node av en blokk.
+ *
+ * Blokken får unike interne ID-er, men beholder de eksponerte portenes
+ * ID-er, slik at ytre koblinger kan peke på dem.
+ */
+function blockNode(template: BlockTemplate, id: NodeId, position: { x: number; y: number }): GraphNode {
+  return {
+    id,
+    type: 'group',
+    title: template.name,
+    params: {},
+    tracks: {},
+    lfo: {},
+    position,
+    enabled: true,
+    group: rekeySubgraph(
+      {
+        nodes: template.nodes,
+        edges: template.edges,
+        inputs: template.inputs,
+        outputs: template.outputs,
+      },
+      id,
+    ),
+  }
 }
 
 const history = new EditHistory(80)
@@ -578,33 +609,50 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   insertBlock: (template, position) => {
     const { graph } = get()
     const groupId = nextId('block')
-    const group = rekeySubgraph(
-      {
-        nodes: template.nodes,
-        edges: template.edges,
-        inputs: template.inputs,
-        outputs: template.outputs,
-      },
-      groupId,
-    )
-
-    const node: GraphNode = {
-      id: groupId,
-      type: 'group',
-      title: template.name,
-      params: {},
-      tracks: {},
-      lfo: {},
-      position: position ?? { x: 120, y: 120 },
-      enabled: true,
-      group,
-    }
+    const node = blockNode(template, groupId, position ?? { x: 120, y: 120 })
 
     set({
       graph: { ...graph, nodes: [...graph.nodes, node] },
       selected: groupId,
       selection: [groupId],
       notice: `Satte inn «${template.name}». Koble til eget innhold på inngangene.`,
+    })
+    return groupId
+  },
+
+  /**
+   * Bytter ut hele nodetreet med en blokk.
+   *
+   * Prosjektinnstillingene (fps, lengde, oppløsning) beholdes — det er
+   * bare grafen som erstattes. Blokkens første eksponerte utgang kobles
+   * til en ny viewport, slik at resultatet vises med én gang.
+   */
+  replaceWithBlock: (template) => {
+    const { graph } = get()
+    const groupId = nextId('block')
+    const node = blockNode(template, groupId, { x: 220, y: 160 })
+    const out = createNode('output.viewport', nextId('out'), { x: 640, y: 200 })
+    out.title = 'Viewport'
+
+    const first = node.group?.outputs[0]
+    const edges: GraphEdge[] = first
+      ? [
+          {
+            id: `${node.id}.${first.id}->${out.id}.frame`,
+            source: node.id,
+            sourcePort: first.id,
+            target: out.id,
+            targetPort: 'frame',
+            kind: 'value',
+          },
+        ]
+      : []
+
+    set({
+      graph: { ...graph, nodes: [node, out], edges },
+      selected: groupId,
+      selection: [groupId],
+      notice: `Erstattet grafen med «${template.name}».`,
     })
     return groupId
   },

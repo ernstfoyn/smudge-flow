@@ -4,6 +4,8 @@ import { BUILTIN_BLOCKS } from '../src/blocks/builtins'
 import { createGroupFromSelection, nodePorts, rekeySubgraph } from '../src/engine/graph'
 import { Evaluator } from '../src/engine/evaluator'
 import { registry } from '../src/nodes'
+import { defaultGraph } from '../src/state/defaultGraph'
+import { useGraphStore } from '../src/state/useGraphStore'
 import type { Graph, GraphNode, RenderServices } from '../src/engine/types'
 
 /** Minimal 2D-kontekst som bare registrerer kall. */
@@ -202,5 +204,38 @@ describe('blokk-bibliotek', () => {
     const { node } = createGroupFromSelection(nodes, edges, ['b'], 'g1', registry)
     expect(node.group?.outputs).toHaveLength(1)
     expect(node.group?.outputs[0].sourceNode).toBe('b')
+  })
+})
+
+describe('last inn blokk i grafen', () => {
+  it('legger blokken til som en gruppe uten å røre resten', () => {
+    useGraphStore.getState().setGraph(defaultGraph())
+    const before = useGraphStore.getState().graph.nodes.length
+
+    const id = useGraphStore.getState().insertBlock(BUILTIN_BLOCKS[0])
+    const graph = useGraphStore.getState().graph
+
+    expect(id).toBeTruthy()
+    expect(graph.nodes).toHaveLength(before + 1)
+    expect(graph.nodes.find((n) => n.id === id)?.group?.nodes.length).toBeGreaterThan(0)
+  })
+
+  it('erstatter hele treet og kobler blokkens utgang til viewport', () => {
+    useGraphStore.getState().setGraph(defaultGraph())
+
+    const id = useGraphStore.getState().replaceWithBlock(BUILTIN_BLOCKS[0])
+    const graph = useGraphStore.getState().graph
+
+    expect(id).toBeTruthy()
+    expect(graph.nodes).toHaveLength(2)
+    expect(graph.nodes[0].id).toBe(id)
+    expect(graph.nodes[0].group).toBeDefined()
+    expect(graph.nodes[1].type).toBe('output.viewport')
+    expect(graph.edges).toHaveLength(1)
+    expect(graph.edges[0].source).toBe(id)
+    expect(graph.edges[0].sourcePort).toBe(BUILTIN_BLOCKS[0].outputs[0].id)
+    expect(graph.edges[0].target).toBe(graph.nodes[1].id)
+    // Prosjektinnstillingene skal overleve erstatningen.
+    expect(graph.settings).toEqual(defaultGraph().settings)
   })
 })

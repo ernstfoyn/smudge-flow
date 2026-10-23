@@ -4,7 +4,6 @@ import {
   Background,
   Controls,
   MiniMap,
-  ReactFlowProvider,
   useReactFlow,
   type Connection,
   type Edge,
@@ -219,9 +218,5 @@ function FlowInner() {
 }
 
 export function FlowCanvas() {
-  return (
-    <ReactFlowProvider>
-      <FlowInner />
-    </ReactFlowProvider>
-  )
+  return <FlowInner />
 }

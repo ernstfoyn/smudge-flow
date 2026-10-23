@@ -142,6 +142,12 @@ To automatiske grep gjør at en blokk faktisk er brukbar:
 inngang uten intern kilde. Da virker blokken med én gang, og en ekstern kilde
 kan overstyre standarden.
 
+Når du trykker «Last inn», spør appen om blokken skal **legges til** i grafen
+du har, eller **erstatte** hele nodetreet. Ved erstatning beholdes
+prosjektinnstillingene (fps, lengde, oppløsning), og blokkens første eksponerte
+utgang kobles til en ny viewport. Etterpå panorerer visningen til det nye
+treet, slik at en blokk aldri ender utenfor lerretet.
+
 Blokker lagres i `localStorage` og kan eksporteres/importeres som JSON.
 
 ---

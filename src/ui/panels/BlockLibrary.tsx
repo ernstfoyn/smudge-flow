@@ -1,7 +1,9 @@
-import { useRef } from 'react'
-import { useLibraryStore, allBlocks } from '../../state/useLibraryStore'
+import { useEffect, useRef, useState } from 'react'
+import { useReactFlow } from '@xyflow/react'
+import { useLibraryStore } from '../../state/useLibraryStore'
 import { useGraphStore } from '../../state/useGraphStore'
 import { BUILTIN_BLOCKS } from '../../blocks/builtins'
+import type { BlockTemplate } from '../../blocks/types'
 
 /**
  * Blokk-biblioteket.
@@ -16,16 +18,54 @@ export function BlockLibrary() {
   const exportBlock = useLibraryStore((s) => s.exportBlock)
   const importBlocks = useLibraryStore((s) => s.importBlocks)
   const insertBlock = useGraphStore((s) => s.insertBlock)
+  const replaceWithBlock = useGraphStore((s) => s.replaceWithBlock)
+  const { fitView } = useReactFlow()
 
   const fileRef = useRef<HTMLInputElement>(null)
+  const [pending, setPending] = useState<BlockTemplate | null>(null)
 
-  const insert = (id: string) => {
-    const block = allBlocks(userBlocks).find((b) => b.id === id)
-    if (!block) return
-    // Plasser litt til høyre for det som allerede finnes.
+  // Lukk dialogen med Escape.
+  useEffect(() => {
+    if (!pending) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPending(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [pending])
+
+  /** Panorerer til noden som nettopp ble satt inn, så den ikke blir borte utenfor lerretet. */
+  const reveal = (id: string | null) => {
+    if (!id) return
+    // React Flow må registrere og måle noden før fitView vet hvor den er.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        void fitView({ nodes: [{ id }], padding: 0.6, duration: 450, maxZoom: 1.1 })
+      })
+    })
+  }
+
+  const insert = (block: BlockTemplate) => {
     const graph = useGraphStore.getState().graph
     const maxX = graph.nodes.reduce((max, n) => Math.max(max, n.position.x), 0)
-    insertBlock(block, { x: maxX + 380, y: 120 })
+    reveal(insertBlock(block, { x: maxX + 380, y: 120 }))
+  }
+
+  const replace = (block: BlockTemplate) => {
+    replaceWithBlock(block)
+    // Ved erstatning er hele treet nytt: vis både gruppen og viewporten.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        void fitView({ padding: 0.2, duration: 450, maxZoom: 1.2 })
+      })
+    })
+  }
+
+  const confirm = (mode: 'add' | 'replace') => {
+    if (!pending) return
+    if (mode === 'add') insert(pending)
+    else replace(pending)
+    setPending(null)
   }
 
   const onImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,7 +119,7 @@ export function BlockLibrary() {
               <button
                 key={block.id}
                 type="button"
-                onClick={() => insert(block.id)}
+                onClick={() => setPending(block)}
                 className="rounded border border-lime-500/50 bg-lime-500/10 px-2 py-1 text-[10px] text-lime-200 hover:bg-lime-500/20"
               >
                 Last inn
@@ -109,7 +149,7 @@ export function BlockLibrary() {
                   <button
                     key={`load-${block.id}`}
                     type="button"
-                    onClick={() => insert(block.id)}
+                    onClick={() => setPending(block)}
                     className="rounded border border-lime-500/50 bg-lime-500/10 px-2 py-1 text-[10px] text-lime-200 hover:bg-lime-500/20"
                   >
                     Last inn
@@ -145,6 +185,59 @@ export function BlockLibrary() {
         </button>
         <input ref={fileRef} type="file" accept="application/json,.json" onChange={onImport} className="hidden" />
       </section>
+
+      {pending && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onMouseDown={() => setPending(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="block-dialog-title"
+            className="w-full max-w-sm rounded-xl border border-zinc-700 bg-zinc-900 p-4 shadow-2xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h3 id="block-dialog-title" className="text-[13px] font-semibold text-zinc-100">
+              Last inn «{pending.name}»
+            </h3>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-400">
+              {pending.nodes.length} noder
+              {pending.inputs.length > 0 && ` · ${pending.inputs.length} inngang(er)`}
+              {pending.outputs.length > 0 && ` · ${pending.outputs.length} utgang(er)`}.
+              Vil du legge blokken til i grafen du har, eller erstatte hele nodetreet?
+            </p>
+            <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
+              Ved erstatning beholdes fps, lengde og oppløsning.
+            </p>
+
+            <div className="mt-4 flex flex-col gap-1.5">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => confirm('add')}
+                className="rounded-lg border border-lime-500/60 bg-lime-500/15 px-3 py-2 text-[12px] font-medium text-lime-100 transition hover:bg-lime-500/25"
+              >
+                Legg til i grafen
+              </button>
+              <button
+                type="button"
+                onClick={() => confirm('replace')}
+                className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-[12px] font-medium text-red-200 transition hover:bg-red-500/20"
+              >
+                Erstatt hele grafen
+              </button>
+              <button
+                type="button"
+                onClick={() => setPending(null)}
+                className="rounded-lg border border-zinc-700 px-3 py-2 text-[12px] text-zinc-400 transition hover:bg-zinc-800"
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
