@@ -131,6 +131,28 @@ export function TextField({
   )
 }
 
+export function CodeField({
+  label,
+  value,
+  onChange,
+  disabled,
+}: BaseProps & { value: string }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] uppercase tracking-wide text-zinc-400">{label}</span>
+      <textarea
+        value={value ?? ''}
+        disabled={disabled}
+        spellCheck={false}
+        wrap="off"
+        rows={7}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full resize-y rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] leading-relaxed text-zinc-100 outline-none focus:border-lime-500 disabled:opacity-40"
+      />
+    </label>
+  )
+}
+
 export function ParamField({
   def,
   value,
@@ -181,6 +203,8 @@ export function ParamField({
           disabled={disabled}
         />
       )
+    case 'code':
+      return <CodeField label={def.label} value={String(value ?? '')} onChange={onChange} disabled={disabled} />
     case 'text':
     default:
       return (

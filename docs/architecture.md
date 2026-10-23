@@ -56,7 +56,7 @@ på CPU og gjør at 2D og 3D kan sameksistere.
 | Domene | Verdityper | Noder |
 |---|---|---|
 | **Raster** | `drawable`, `canvas`, `frame` | gradient, motionGraphics, noise, voronoi, image, transform2D, raster, blur, pixelate, warp, blend, stack, bloom, grade |
-| **3D** | `object3d` | mesh3D, transform3D, scatter3D, sceneObject, sceneGroup |
+| **3D** | `object3d` | mesh3D, text3D, transform3D, scatter3D, sceneObject, sceneGroup |
 | **Bro** | `object3d` → `canvas` | `composite.sceneRender` |
 | **Data** | `number`, `string`, `boolean`, `color` | loop, camera, lights, param-koblinger |
 
@@ -200,6 +200,7 @@ effekter i en løkke over `uLookOrder`. Nå er de delt:
 | 16 effekter | `render/shaders/looks.ts` | `modifier.look.*` |
 | Grade + glød | `render/shaders/postFx.ts` | `modifier.grade`, `modifier.bloom` |
 | Støy + celler | `render/shaders/generators.ts` | `source.noise`, `source.voronoi` |
+| Egen GLSL | `render/shaders/custom.ts` | `modifier.shader` |
 
 **Grunnmaterialet** (`modifier.smudgeDeform`) har beholdt trailen av
 ekko-kopier, hue/metning, fresnel-rand og glans. Det er vertex-normalene
@@ -242,6 +243,25 @@ overalt og mistet determinismen i eksporten), men portet enkeltdeler:
 morfer mellom to z-snitt med `sin²(π·fase)`; begge er null i enden av loopen.
 Celler og spredning bruker bare sirkulær drift og hele omdreininger. Frame 0 og
 frame N er derfor bit-identiske (verifisert med pikseldiff i nettleseren).
+
+### 3D-tekst
+
+`source.text3D` ekstruderer tekst til ekte geometri med three.js sin
+`TextGeometry`. Fonten er Droid Sans og ligger i `src/assets` sammen med
+lisensen — npm-utgaven av three har ikke eksempelfontene. Droid Sans dekker
+nordiske tegn. Fonten parses én gang per økt, og geometrien memoiseres per
+tekst, størrelse, tykkelse og kurvekvalitet. Geometrien er sentrert rundt
+origo, så den roterer rundt midtpunktet.
+
+### Egen shader
+
+`modifier.shader` lar deg skrive GLSL i inspectoren. Koden blir kroppen i
+`applyLook()`, med samme kontrakt som de innebygde effektene (`col`, `uv`,
+`centered`, `bl`, `pw`, `sc`, `uTime`, `uValueA–D`, `uColorA/B`). Fire tall
+og to farger er animerbare parametere, så shaderen kan styres av keyframes,
+LFO-er og loop-generatorer som alt annet. Tiden er `fase · sekunder · cycles`,
+med fasen brettet til 0..1: hele `cycles` per loop gir eksakt samme tid i
+frame 0 og frame N.
 
 ---
 
@@ -396,7 +416,8 @@ får en rød prikk.
 | 7j | **Scenemodellen**: lag per lag, hierarki, kamera og lys som verdier | ✅ |
 | 7k | **Lån fra vgpu**: 3D-former, materialmodus, Grade/Glød | ✅ |
 | 7l | **Lån fra vgpu**: støy, celler og spredning (loop-sikkert) | ✅ |
-| 8 | Tekst som 3D-geometri, scene-import fra gammelt format | ⬜ |
+| 8a | **Tekst som 3D-geometri** (`source.text3D`) | ✅ |
+| 8b | **Scene-import** fra den gamle appens `scene.json` | ⬜ |
 | 9 | Rydd: slett `src/legacy/`, flytt `src/engine` til `packages/engine` | ⬜ |
 
 ### Trail-laget
@@ -441,8 +462,7 @@ internt.
 
 ### Planlagt for neste runde
 
-- **Tekst som 3D-geometri** (`text-mesh.js` er port-klar).
 - **Scene-import** fra den gamle appens `scene.json` — hvert objekt blir en
-  kjede av `source.mesh3D`/`scene.object`/`scene.group`.
+  kjede av `source.mesh3D`/`source.text3D`/`scene.object`/`scene.group`.
 - **Tekstur-sampling** (`sampleTexture.js`) som egne noder.
 - **Scene-editor**: lag med 2D- og 3D-objekter, 3D-kamera som en node.

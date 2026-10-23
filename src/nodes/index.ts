@@ -4,6 +4,7 @@ import { motionGraphicsSource } from './source/motionGraphicsSource'
 import { imageSource } from './source/imageSource'
 import { loopSource } from './source/loopSource'
 import { mesh3D } from './source/mesh3D'
+import { text3D } from './source/text3D'
 import { blob3D } from './source/blob3D'
 import { objSource } from './source/objSource'
 import { noise } from './source/noise'
@@ -17,6 +18,7 @@ import { transform3D } from './modifier/transform3D'
 import { raster } from './modifier/raster'
 import { blurNode, pixelateNode, warpNode } from './modifier/pixelNodes'
 import { grade } from './modifier/grade'
+import { shader } from './modifier/shader'
 import { bloom } from './modifier/bloom'
 import { blend } from './composite/blend'
 import { stack } from './composite/stack'
@@ -40,6 +42,7 @@ export const registry = new NodeRegistry().registerAll([
   imageSource,
   loopSource,
   mesh3D,
+  text3D,
   blob3D,
   objSource,
   noise,
@@ -57,6 +60,7 @@ export const registry = new NodeRegistry().registerAll([
   warpNode,
   bloom,
   grade,
+  shader,
   // Kompositt
   blend,
   stack,

@@ -224,6 +224,35 @@ function treDScene(): BlockTemplate {
   )
 }
 
+function treDTekst(): BlockTemplate {
+  const b = new TemplateBuilder()
+  const text = b.node(
+    'source.text3D',
+    { text: 'SMUDGE', size: 0.55, depth: 0.18, color: '#b9ff66', roughness: 0.3, metalness: 0.35 },
+    { x: 0, y: 0 },
+  )
+  const transform = b.node('modifier.transform3D', { rotX: 12, rotY: 0 }, { x: 240, y: 0 })
+  const scene = b.node(
+    'composite.sceneRender',
+    { cameraDistance: 4.5, ambient: 1.2, directional: 2, spin: 0 },
+    { x: 480, y: 0 },
+  )
+
+  b.connect(text, 'out', transform, 'in')
+  b.connect(transform, 'out', scene, 'in')
+  b.exposeOutput(scene, 'out', '3D-tekst')
+  // Objektet eksponeres, slik at teksten kan settes inn i en større scene.
+  b.exposeInput(transform, 'in', 'Objekt')
+
+  return withDefaultSources(
+    b.build(
+      '3D-tekst',
+      'Ekstrudert tekst med transform og scene. Bytt teksten i 3D-tekst-noden.',
+      '3D',
+    ),
+  )
+}
+
 function treDGruppe(): BlockTemplate {
   const b = new TemplateBuilder()
   const group = b.node('scene.group', {}, { x: 0, y: 0 })
@@ -246,6 +275,7 @@ export const BUILTIN_BLOCKS: BlockTemplate[] = [
   generativeBakgrunn(),
   rasterBehandling(),
   treDForm(),
+  treDTekst(),
   treDScene(),
   treDGruppe(),
   loopAnimertForvrengning(),

@@ -62,6 +62,8 @@ export type ParamType =
   | 'color'
   | 'enum'
   | 'text'
+  /** Flerlinjet kildekode (monospace) — f.eks. GLSL til `modifier.shader`. */
+  | 'code'
   /** En liste med egne widgets (f.eks. malte stempler). */
   | 'stamps'
   /** En fil — leses inn som data-URL. */
