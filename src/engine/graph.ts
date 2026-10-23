@@ -162,14 +162,28 @@ export function rekeySubgraph(group: Subgraph, prefix: string): Subgraph {
   const idMap = new Map<NodeId, NodeId>()
   for (const node of group.nodes) idMap.set(node.id, `${prefix}/${node.id}`)
 
-  return {
-    nodes: group.nodes.map((node) => ({ ...node, id: idMap.get(node.id)! })),
-    edges: group.edges.map((edge) => ({
+  // Per-lag-innstillinger er nøklet på kant-id. Når kantene får nye ID-er,
+  // må nøklene følge etter — ellers ville en kopi miste laginnstillingene.
+  const edgeIdMap = new Map<string, string>()
+
+  const edges = group.edges.map((edge) => {
+    const id = `${idMap.get(edge.source)}-${edge.sourcePort}->${idMap.get(edge.target)}-${edge.targetPort}`
+    edgeIdMap.set(edge.id, id)
+    return {
       ...edge,
-      id: `${idMap.get(edge.source)}-${edge.sourcePort}->${idMap.get(edge.target)}-${edge.targetPort}`,
+      id,
       source: idMap.get(edge.source)!,
       target: idMap.get(edge.target)!,
+    }
+  })
+
+  return {
+    nodes: group.nodes.map((node) => ({
+      ...node,
+      id: idMap.get(node.id)!,
+      params: remapLayerKeys(node.params, edgeIdMap),
     })),
+    edges,
     inputs: group.inputs.map((input) => ({
       ...input,
       targetNode: idMap.get(input.targetNode) ?? input.targetNode,
@@ -179,6 +193,21 @@ export function rekeySubgraph(group: Subgraph, prefix: string): Subgraph {
       sourceNode: idMap.get(output.sourceNode) ?? output.sourceNode,
     })),
   }
+}
+
+/** Flytter `params.layers`-nøkler over til nye kant-ID-er. */
+function remapLayerKeys(
+  params: Record<string, unknown>,
+  edgeIdMap: Map<string, string>,
+): Record<string, unknown> {
+  const layers = params?.layers
+  if (!layers || typeof layers !== 'object' || Array.isArray(layers)) return params
+
+  const remapped: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(layers as Record<string, unknown>)) {
+    remapped[edgeIdMap.get(key) ?? key] = value
+  }
+  return { ...params, layers: remapped }
 }
 
 export interface GroupResult {

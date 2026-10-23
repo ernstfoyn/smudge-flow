@@ -180,11 +180,35 @@ export function blockFromSelection(
 }
 
 /**
+ * Standardkilde per verditype.
+ *
+ * Uten typebevissthet ville en 3D-inngang fått en gradient inn — feil
+ * domene. Nå får hver port et standardinnhold som faktisk passer.
+ */
+const DEFAULT_SOURCES: Record<
+  string,
+  { type: string; params: Record<string, unknown>; title: string }
+> = {
+  canvas: {
+    type: 'source.gradient',
+    title: 'Standard',
+    params: { fill: 'radial', colorA: '#4a5160', colorB: '#1b1f27' },
+  },
+  object3d: {
+    type: 'source.mesh3D',
+    title: 'Standard 3D',
+    params: { shape: 'icosahedron', size: 0.35, color: '#7ad7ff' },
+  },
+  camera: { type: 'scene.camera', title: 'Standard kamera', params: {} },
+  lights: { type: 'scene.lights', title: 'Standard lys', params: {} },
+}
+
+/**
  * Sørger for at hver eksponert inngang har en standardverdi inne i blokken.
  *
  * Uten dette ville en blokk uten tilkoblet innhold feile med «mangler
  * input». Med en standard kan blokken lastes inn og virke med én gang,
- * og en ekstern kilse kan overstyre den.
+ * og en ekstern kilde kan overstyre den.
  */
 export function withDefaultSources(template: BlockTemplate): BlockTemplate {
   const result = structuredClone(template)
@@ -196,20 +220,22 @@ export function withDefaultSources(template: BlockTemplate): BlockTemplate {
     )
     if (hasDefault) continue
 
-    const def = registry.get('source.gradient')
+    const spec = DEFAULT_SOURCES[input.type]
+    // Ukjent type: heller ingen standard enn en som ikke passer porten.
+    if (!spec) continue
+
+    const def = registry.get(spec.type)
     const params: Record<string, unknown> = {}
     for (const p of def.params) params[p.key] = p.default
     // Et synlig standardinnhold, slik at blokken virker med én gang
     // og effekten kan ses, før brukeren kobler sitt eget innhold.
-    params.fill = 'radial'
-    params.colorA = '#4a5160'
-    params.colorB = '#1b1f27'
+    Object.assign(params, spec.params)
 
     const id = `default-${counter++}`
     result.nodes.push({
       id,
-      type: 'source.gradient',
-      title: 'Standard',
+      type: spec.type,
+      title: spec.title,
       params,
       tracks: {},
       lfo: {},

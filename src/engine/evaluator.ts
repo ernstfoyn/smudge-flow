@@ -163,6 +163,8 @@ export class Evaluator {
       }
 
       const inputs: InputValues = {}
+      /** Kantene bak hver inputverdi — brukes til per-lag-innstillinger. */
+      const inputEdges: Record<string, GraphEdge[]> = {}
       for (const port of def.inputs) {
         const injectionKey = `${id}\u0000${port.id}`
         if (injected.has(injectionKey)) {
@@ -173,10 +175,18 @@ export class Evaluator {
         const edges = incoming.get(injectionKey) ?? []
 
         if (port.multiple) {
-          const values = edges
-            .map((edge) => outputs.get(edge.source)?.[edge.sourcePort])
-            .filter((value) => value !== undefined)
+          const values: unknown[] = []
+          const used: GraphEdge[] = []
+          for (const edge of edges) {
+            const value = outputs.get(edge.source)?.[edge.sourcePort]
+            // Verdier som mangler hoppes over, akkurat som før. Kanten
+            // hoppes over samtidig, slik at verdi og kant følger hverandre.
+            if (value === undefined) continue
+            values.push(value)
+            used.push(edge)
+          }
           inputs[port.id] = values
+          inputEdges[port.id] = used
           if (!values.length && !port.optional) {
             throw new GraphError(
               `«${node.title}» mangler input «${port.label}» — koble minst én kilde til porten.`,
@@ -187,6 +197,7 @@ export class Evaluator {
 
         const edge = edges[edges.length - 1]
         const value = edge ? outputs.get(edge.source)?.[edge.sourcePort] : undefined
+        if (edge && value !== undefined) inputEdges[port.id] = [edge]
         if (value === undefined && !port.optional) {
           throw new GraphError(
             `«${node.title}» mangler input «${port.label}» — koble en kilde til porten.`,
@@ -207,6 +218,7 @@ export class Evaluator {
         height: settings.height,
         render: this.render,
         nodeCache: this.nodeCache(`${path}/${id}`),
+        inputEdges,
         signal,
       }
 
@@ -235,7 +247,7 @@ export class Evaluator {
 
       if (!timeDependent) {
         const cached = this.memo.get(memoKey)
-        const sig = this.signature(params, incoming, id, injected)
+        const sig = this.signature(params, incoming, id, injected, path)
         if (cached && cached.sig === sig) {
           outputs.set(id, cached.output)
           continue
@@ -263,16 +275,24 @@ export class Evaluator {
    *
    * Vi bruker node-versjoner (ikke objektidentitet), slik at signaturen også
    * fungerer for verdier som ikke er lerret — 3D-objekter, geometri, tall.
+   *
+   * Kildene må slås opp med *scope-prefiks*: versjonene lagres under
+   * `ctx.scopeKey` (`<sti>/<id>`), ikke under den rå node-ID-en. Uten
+   * prefikset ville signaturen aldri sett at en inngang endret seg, og
+   * tidsuavhengige noder ville blitt stående med gammel output.
    */
   private signature(
     params: Record<string, unknown>,
     incoming: Map<string, GraphEdge[]>,
     nodeId: NodeId,
     injected: Map<string, unknown>,
+    path: string,
   ): string {
     const parts: string[] = [JSON.stringify(params)]
     for (const [key, edges] of incoming) {
-      const tokens = edges.map((e) => `${e.source}@${this.nodeVersion(e.source)}`).join(',')
+      const tokens = edges
+        .map((e) => `${e.source}@${this.nodeVersion(`${path}/${e.source}`)}`)
+        .join(',')
       parts.push(`${key}=${tokens}`)
     }
     for (const [key, value] of injected) {

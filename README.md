@@ -76,8 +76,12 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `modifier.pixelate` | modifikator | Orbit `image-effects.js` |
 | `modifier.warp` | modifikator | Orbit `image-effects.js` |
 | `composite.blend` | kompositt | Smudge `BlendStage.jsx` (8 blendemodeller) |
-| `composite.stack` | kompositt | Ny — kombinerer N lag i én node |
+| `composite.stack` | kompositt | Ny — lagliste med per-lag modus, dekkevne og synlighet |
 | `composite.sceneRender` | kompositt | Ny — maler 3D ned på raster (bro mellom 2D og 3D) |
+| `scene.object` | kompositt | Ny — ett 3D-objekts plassering, dekkevne og synlighet |
+| `scene.group` | kompositt | Ny — hierarki: flere 3D-objekter som én enhet |
+| `scene.camera` | kompositt | Ny — 3D-kamera som animerbar verdi |
+| `scene.lights` | kompositt | Ny — belysning som animerbar verdi |
 | `output.viewport` | output | Ny — merker leveransen for preview |
 | `output.export` | output | Ny — merker leveransen for MP4 |
 
@@ -85,8 +89,12 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 
 `composite.blend` har to innganger: **Bunn** og **Topp**. For flere lag bruker
 du **Lagstabel** (`composite.stack`): koble så mange kilder du vil inn i samme
-port «Lag». Lag 1 er bunnen, resten blandes oppå med valgt modus og dekkevne.
-Rekkefølgen kan endres i inspectoren (↑/↓ per lag).
+port «Lag». Lag 1 er bunnen, resten blandes oppå.
+
+Hvert lag har **egen** blandemodus, dekkevne og synlighet — det er laglisten
+i komposisjonen. Rekkefølgen endres med ↑/↓, og øyet skjuler et lag uten å
+koble det fra. Innstillingene er nøklet på koblingen, så de følger laget når
+det flyttes, og kommer tilbake hvis du kobler det fra og til igjen.
 
 > Merk: en inngangsport på en vanlig node holder **én** kobling. Koble du en
 > tredje kilde inn i «Bunn», erstattes den gamle forbindelsen — appen varsler
@@ -212,12 +220,50 @@ resultatet med originalen.
 
 ---
 
+## Scenen: rekkefølge og hierarki
+
+En nodegraf har ingen innebygd *rekkefølge* og ingen *hierarki* — to ting en
+scene trenger. De er løst med hver sin node, i stedet for med én stor
+scene-node:
+
+| Behov | Løsning |
+|---|---|
+| Hva ligger øverst? | **Lagstabel** (`composite.stack`) — z-order |
+| Hva hører sammen? | **Gruppe (3D)** (`scene.group`) — barn |
+| Flytt alt i gruppen | **Objekt** (`scene.object`) etter gruppen — transformen legges oppå |
+| Hvor står kameraet? | **Kamera (3D)** (`scene.camera`) — verdi |
+| Hvordan er lyset? | **Belysning (3D)** (`scene.lights`) — verdi |
+
+```
+source.mesh3D ──▶ scene.object ──┐
+                                 ├─▶ scene.group ──▶ scene.object ──┐
+source.obj ─────▶ scene.object ──┘      (barn)         (forelder)   │
+                                                                   ├─▶ sceneRender
+                             scene.camera ─────────────────────────┤
+                             scene.lights ─────────────────────────┘
+```
+
+Alt er vanlige noder: hvert objekt kan kobles til en loop-generator, hver
+kamera-parameter kan animeres, og hele scenen kan markeres og lagres som en
+blokk. Det er motsetningen til én svart boks med en egen editor inni.
+
+`scene.object` **legger** transformen sin oppå objektets egen (den erstatter
+ikke, slik `modifier.transform3D` gjør). Derfor kan den brukes både som
+plasseringsverktøy og som forelder for en gruppe.
+
+---
+
 ## Blokk-bibliotek
 
 Fanen **Blokker** inneholder ferdige oppsett og blokkene du selv har lagret.
 
 **Innebygde oppsett:** Generativ bakgrunn, Raster-behandling, 3D-form,
-Loop-animert forvrengning, Lagstabel.
+3D-scene, 3D-gruppe, Loop-animert forvrengning, Lagstabel, Smudge-glass,
+Glass-blob.
+
+**3D-scene** er den komplette scenen: to innebygde former i en gruppe, en
+forelder, kamera og belysning. Koble egne objekter inn i «Egne objekter» —
+de legges til uten å fortrenge de innebygde.
 
 **Slik lagrer du et nodetre for gjenbruk:**
 

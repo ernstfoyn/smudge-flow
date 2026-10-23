@@ -24,6 +24,8 @@ export type NodeId = string
  *  geometry  = normalisert mesh (vertices/triangles/normals)
  *  material  = materialbeskrivelse (shader + uniforms)
  *  scene     = 3D-beskrivelse (fase 7)
+ *  camera    = 3D-kamera (posisjon, mål, synsvinkel)
+ *  lights    = 3D-belysning (omgivelse, hovedlys, rimlys)
  */
 export type ValueType =
   | 'drawable'
@@ -33,6 +35,8 @@ export type ValueType =
   | 'geometry'
   | 'material'
   | 'scene'
+  | 'camera'
+  | 'lights'
   | 'number'
   | 'string'
   | 'boolean'
@@ -62,6 +66,11 @@ export type ParamType =
   | 'stamps'
   /** En fil — leses inn som data-URL. */
   | 'file'
+  /**
+   * Per-lag-innstillinger for en multiple-port, nøklet på kant-id.
+   * Brukes av lagstabelen: hvert lag får sin egen modus og dekkevne.
+   */
+  | 'layers'
 
 export interface ParamDef {
   /** Støtter punktsti, f.eks. "transform.position.x". */
@@ -253,6 +262,13 @@ export interface EvalContext {
   render: RenderServices
   /** Ressurser som lever over frames for denne noden. */
   nodeCache: Map<string, unknown>
+  /**
+   * Kantene som matet hver multiple-port, i samme rekkefølge som verdiene.
+   *
+   * Uten dette vet ikke noden *hvilket* lag en verdi kom fra, og kan ikke
+   * lagre per-lag-innstillinger (modus, dekkevne, synlighet) stabilt.
+   */
+  inputEdges?: Record<string, GraphEdge[]>
   signal?: AbortSignal
 }
 

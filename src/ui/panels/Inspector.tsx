@@ -7,6 +7,7 @@ import { usePlaybackStore } from '../../state/usePlaybackStore'
 import { ParamField } from '../primitives/Fields'
 import { TrailPad } from './TrailPad'
 import { WAVEFORMS } from '../../engine/animation/lfo'
+import { STACK_MODES, type StackMode } from '../../nodes/composite/stack'
 
 /** Filvelger som leser filen inn som data-URL. */
 function FileField({
@@ -74,6 +75,7 @@ export function Inspector() {
   const setLfo = useGraphStore((s) => s.setLfo)
   const setKeyframe = useGraphStore((s) => s.setKeyframe)
   const reorderInput = useGraphStore((s) => s.reorderInput)
+  const setLayerSetting = useGraphStore((s) => s.setLayerSetting)
   const disconnect = useGraphStore((s) => s.disconnect)
   const ungroup = useGraphStore((s) => s.ungroup)
   const instantiate = useGraphStore((s) => s.instantiate)
@@ -348,10 +350,24 @@ export function Inspector() {
 
       {layerPorts.map((port) => {
         const edges = graph.edges.filter((e) => e.target === node.id && e.targetPort === port.id)
+        const layersParam = params.find((p) => p.type === 'layers')
+        const settingsFor = (edgeId: string) => {
+          const layers = (node.params[layersParam?.key ?? ''] ?? {}) as Record<
+            string,
+            { mode?: string; opacity?: number; visible?: boolean }
+          >
+          const own = layers[edgeId]
+          return {
+            mode: own?.mode ?? String(node.params.mode ?? 'normal'),
+            opacity: own?.opacity ?? Number(node.params.opacity ?? 1),
+            visible: own?.visible ?? true,
+          }
+        }
+
         return (
           <section key={port.id} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
             <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-              {port.label} · {edges.length} lag
+              {port.label} · {edges.length} {layersParam ? 'lag' : 'elementer'}
             </h3>
 
             {edges.length === 0 && (
@@ -361,48 +377,113 @@ export function Inspector() {
             <ol className="flex flex-col gap-1">
               {edges.map((edge, index) => {
                 const source = graph.nodes.find((n) => n.id === edge.source)
+                const settings = settingsFor(edge.id)
+
                 return (
                   <li
                     key={edge.id}
-                    className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1"
+                    className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1"
                   >
-                    <span className="w-4 text-[10px] tabular-nums text-zinc-600">{index + 1}</span>
-                    <span className="flex-1 truncate text-[11px] text-zinc-300">
-                      {source?.title ?? edge.source}
-                    </span>
-                    <button
-                      type="button"
-                      title="Flytt opp"
-                      disabled={index === 0}
-                      onClick={() => reorderInput(node.id, port.id, index, index - 1)}
-                      className="rounded px-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-25"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      title="Flytt ned"
-                      disabled={index === edges.length - 1}
-                      onClick={() => reorderInput(node.id, port.id, index, index + 1)}
-                      className="rounded px-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-25"
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      title="Koble fra"
-                      onClick={() => disconnect(edge.id)}
-                      className="rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
-                    >
-                      ✕
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 text-[10px] tabular-nums text-zinc-600">
+                        {index + 1}
+                      </span>
+                      <span
+                        className={`flex-1 truncate text-[11px] ${
+                          settings.visible ? 'text-zinc-300' : 'text-zinc-600 line-through'
+                        }`}
+                      >
+                        {source?.title ?? edge.source}
+                      </span>
+                      {layersParam && (
+                        <button
+                          type="button"
+                          title={settings.visible ? 'Skjul laget' : 'Vis laget'}
+                          onClick={() =>
+                            setLayerSetting(node.id, edge.id, { visible: !settings.visible })
+                          }
+                          className={`rounded px-1 text-[11px] ${
+                            settings.visible
+                              ? 'text-zinc-400 hover:bg-zinc-800'
+                              : 'text-zinc-600 hover:bg-zinc-800'
+                          }`}
+                        >
+                          {settings.visible ? '◉' : '○'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        title="Flytt opp"
+                        disabled={index === 0}
+                        onClick={() => reorderInput(node.id, port.id, index, index - 1)}
+                        className="rounded px-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-25"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        title="Flytt ned"
+                        disabled={index === edges.length - 1}
+                        onClick={() => reorderInput(node.id, port.id, index, index + 1)}
+                        className="rounded px-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-25"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        title="Koble fra"
+                        onClick={() => disconnect(edge.id)}
+                        className="rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {layersParam && (
+                      <div className="mt-1 flex items-center gap-1.5 pl-5">
+                        <select
+                          value={settings.mode}
+                          onChange={(e) =>
+                            setLayerSetting(node.id, edge.id, {
+                              mode: e.target.value as StackMode,
+                            })
+                          }
+                          className="min-w-0 flex-1 rounded border border-zinc-800 bg-zinc-900 px-1 py-0.5 text-[10px] text-zinc-300 outline-none focus:border-lime-500"
+                        >
+                          {STACK_MODES.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={settings.opacity}
+                          onChange={(e) =>
+                            setLayerSetting(node.id, edge.id, {
+                              opacity: Number(e.target.value),
+                            })
+                          }
+                          className="h-1 w-16 accent-lime-400"
+                          title="Dekkevne"
+                        />
+                        <span className="w-8 text-right text-[10px] tabular-nums text-zinc-500">
+                          {settings.opacity.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                   </li>
                 )
               })}
             </ol>
 
             <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
-              Lag 1 er bunnen. Resten blandes oppå med modus og dekkevne under.
+              {layersParam
+                ? 'Lag 1 er bunnen. Hvert lag har egen modus, dekkevne og synlighet.'
+                : 'Rekkefølgen er uten betydning for 3D (dybden avgjør), men brukes av gruppen.'}
             </p>
           </section>
         )
@@ -471,7 +552,7 @@ export function Inspector() {
         </section>
       )}
 
-      {params.map((p) => {
+      {params.filter((p) => p.type !== 'layers').map((p) => {
         const value = node.params[p.key] ?? p.default
         const lfo = node.lfo?.[p.key]
         const hasKeys = (node.tracks?.[p.key]?.length ?? 0) > 0

@@ -1,6 +1,7 @@
 import { Evaluator } from '../engine/evaluator'
 import { BrowserRenderServices } from '../render/RenderServices'
 import { registry } from '../nodes'
+import { BUILTIN_BLOCKS } from '../blocks/builtins'
 import { useGraphStore } from './useGraphStore'
 
 /**
@@ -30,5 +31,6 @@ if (import.meta.env.DEV) {
     store: useGraphStore,
     evaluator,
     renderServices,
+    blocks: BUILTIN_BLOCKS,
   }
 }

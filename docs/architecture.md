@@ -370,7 +370,8 @@ får en rød prikk.
 | 7g | **Blob-mode** (`source.blob3D`) | ✅ |
 | 7h | **Undo/redo** | ✅ |
 | 7i | **OBJ-import** (`source.obj`) | ✅ |
-| 8 | Scene-editor (lag, 3D-kamera, tekst), undo/redo | ⬜ |
+| 7j | **Scenemodellen**: lag per lag, hierarki, kamera og lys som verdier | ✅ |
+| 8 | Tekst som 3D-geometri, scene-import fra gammelt format | ⬜ |
 | 9 | Rydd: slett `src/legacy/`, flytt `src/engine` til `packages/engine` | ⬜ |
 
 ### Trail-laget
@@ -386,10 +387,37 @@ Maleputen i inspectoren skriver disse, og `modifier.trail` rendrer dem på nytt
 hver frame. Da er laget deterministisk, kan kopieres og animeres, og gir
 samme resultat ved hver eksport.
 
+### Scenemodellen
+
+En DAG kan ikke uttrykke to ting som en scene trenger: **rekkefølge** og
+**hierarki**. Løsningen er ikke én scene-node, men to små prinsipper:
+
+- **Rekkefølge** — `composite.stack` er laglisten. Hvert lag har egne
+  innstillinger, nøklet på kant-id (deterministisk: `kilde.port->mål.port`).
+  Derfor følger innstillingene laget når det flyttes, og overlever at det
+  kobles fra og til. `rekeySubgraph` flytter nøklene når en gruppe kopieres.
+- **Hierarki** — `scene.group` samler objekter til én verdi med barn.
+  `scene.object` etter gruppen legger sin transform oppå gruppens, slik at
+  hele treet flyttes som én. Transformen *legges oppå* (compose), den
+  erstatter ikke — det er forskjellen fra `modifier.transform3D`.
+
+Kamera og lys er **verdier** (`scene.camera`, `scene.lights`), ikke skjulte
+innstillinger på rendereren. Da kan de animeres, kobles til en loop-generator
+og inngå i en blokk. `composite.sceneRender` tar dem som valgfrie innganger
+og faller tilbake på sine egne parametere.
+
+Motoren gir hver node `ctx.inputEdges` — kantene bak hver multiple-port, i
+samme rekkefølge som verdiene. Det er det som gjør per-lag-innstillinger
+mulige uten å gjette hvilket lag en verdi kom fra.
+
+**Kjent begrensning:** lag som kommer *utenfra* en gruppe har ingen kant-id
+inne i gruppen, så per-lag-innstillinger gjelder bare for lag som er koblet
+internt.
+
 ### Planlagt for neste runde
 
-- **Scene-editor**: lag med 2D- og 3D-objekter, 3D-kamera som en node,
-  tekst som 3D-geometri (`text-mesh.js` er allerede port-klar).
 - **Tekst som 3D-geometri** (`text-mesh.js` er port-klar).
+- **Scene-import** fra den gamle appens `scene.json` — hvert objekt blir en
+  kjede av `source.mesh3D`/`scene.object`/`scene.group`.
 - **Tekstur-sampling** (`sampleTexture.js`) som egne noder.
 - **Scene-editor**: lag med 2D- og 3D-objekter, 3D-kamera som en node.

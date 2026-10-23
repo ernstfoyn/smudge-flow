@@ -16,6 +16,10 @@ import { blurNode, pixelateNode, warpNode } from './modifier/pixelNodes'
 import { blend } from './composite/blend'
 import { stack } from './composite/stack'
 import { sceneRender } from './composite/sceneRender'
+import { sceneObject } from './composite/sceneObject'
+import { sceneGroup } from './composite/sceneGroup'
+import { sceneCamera } from './composite/sceneCamera'
+import { sceneLights } from './composite/sceneLights'
 import { exportOutput, viewport } from './output/outputs'
 
 /**
@@ -47,6 +51,10 @@ export const registry = new NodeRegistry().registerAll([
   blend,
   stack,
   sceneRender,
+  sceneObject,
+  sceneGroup,
+  sceneCamera,
+  sceneLights,
   // Output
   viewport,
   exportOutput,

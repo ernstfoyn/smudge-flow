@@ -17,6 +17,7 @@ import { blockFromSelection } from '../blocks/builder'
 import { useLibraryStore } from './useLibraryStore'
 import type { BlockTemplate } from '../blocks/types'
 import type { TrailStamp } from '../nodes/modifier/trail'
+import type { LayerSettings } from '../nodes/composite/stack'
 import { defaultGraph, makeNode } from './defaultGraph'
 import { EditHistory } from './history'
 
@@ -74,6 +75,8 @@ interface GraphState {
   saveSelectionAsBlock: (name: string, description?: string) => BlockTemplate | null
 
   setParam: (id: NodeId, key: string, value: unknown) => void
+  /** Setter innstillinger for ett lag i en lagstabel (nøklet på kant-id). */
+  setLayerSetting: (id: NodeId, edgeId: string, patch: Partial<LayerSettings>) => void
   resetParams: (id: NodeId) => void
   setKeyframe: (id: NodeId, path: string, frame: number, value: unknown) => void
   removeKeyframe: (id: NodeId, path: string, frame: number) => void
@@ -671,6 +674,32 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         nodes: s.graph.nodes.map((n) =>
           n.id === id ? { ...n, params: { ...n.params, [key]: value } } : n,
         ),
+      },
+    })),
+
+  /**
+   * Setter innstillinger for ett lag i en lagstabel.
+   *
+   * Nøkkelen er kant-id, som er deterministisk (`kilde.port->mål.port`).
+   * Derfor følger innstillingene laget når det flyttes, og kommer tilbake
+   * hvis laget kobles fra og til igjen.
+   */
+  setLayerSetting: (id, edgeId, patch) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) => {
+          if (n.id !== id) return n
+          const layers = (n.params.layers ?? {}) as Record<string, LayerSettings>
+          const current = layers[edgeId]
+          const next: LayerSettings = {
+            mode: current?.mode ?? ((n.params.mode as LayerSettings['mode']) ?? 'normal'),
+            opacity: current?.opacity ?? Number(n.params.opacity ?? 1),
+            visible: current?.visible ?? true,
+            ...patch,
+          }
+          return { ...n, params: { ...n.params, layers: { ...layers, [edgeId]: next } } }
+        }),
       },
     })),
 

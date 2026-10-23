@@ -167,10 +167,87 @@ function glassBlob(): BlockTemplate {
   )
 }
 
+function treDScene(): BlockTemplate {
+  const b = new TemplateBuilder()
+
+  // To innebygde former, slik at scenen har innhold med én gang.
+  const torus = b.node(
+    'source.mesh3D',
+    { shape: 'torus', size: 0.5, color: '#b9ff66', roughness: 0.35, metalness: 0.25 },
+    { x: -620, y: 0 },
+  )
+  const sphere = b.node(
+    'source.mesh3D',
+    { shape: 'sphere', size: 0.28, color: '#ff6f91', roughness: 0.2, metalness: 0.5 },
+    { x: -620, y: 180 },
+  )
+
+  const left = b.node('scene.object', { posX: -0.75 }, { x: -380, y: 0 })
+  const right = b.node('scene.object', { posX: 0.75 }, { x: -380, y: 180 })
+
+  const builtIn = b.node('scene.group', {}, { x: -140, y: 60 })
+  // Egne objekter kommer inn her, uten å fortrenge de innebygde.
+  const userObjects = b.node('scene.group', {}, { x: -140, y: 320 })
+
+  const all = b.node('scene.group', {}, { x: 100, y: 160 })
+  const parent = b.node('scene.object', { rotY: 12, posY: 0.15 }, { x: 340, y: 160 })
+
+  const camera = b.node('scene.camera', { posZ: 4.5, posY: 0.4 }, { x: 340, y: 340 })
+  const lights = b.node('scene.lights', {}, { x: 340, y: 460 })
+
+  const scene = b.node(
+    'composite.sceneRender',
+    { cameraDistance: 4.5, ambient: 1.2, directional: 2, spin: 1 },
+    { x: 580, y: 220 },
+  )
+
+  b.connect(torus, 'out', left, 'in')
+  b.connect(sphere, 'out', right, 'in')
+  b.connect(left, 'out', builtIn, 'children')
+  b.connect(right, 'out', builtIn, 'children')
+  b.connect(builtIn, 'out', all, 'children')
+  b.connect(userObjects, 'out', all, 'children')
+  b.connect(all, 'out', parent, 'in')
+  b.connect(parent, 'out', scene, 'in')
+  b.connect(camera, 'out', scene, 'camera')
+  b.connect(lights, 'out', scene, 'lights')
+
+  b.exposeInput(userObjects, 'children', 'Egne objekter')
+  b.exposeOutput(scene, 'out', 'Scene')
+
+  return withDefaultSources(
+    b.build(
+      '3D-scene',
+      'Komplett scene: gruppe med objekter, kamera og belysning. Koble egne objekter inn i «Egne objekter».',
+      '3D',
+    ),
+  )
+}
+
+function treDGruppe(): BlockTemplate {
+  const b = new TemplateBuilder()
+  const group = b.node('scene.group', {}, { x: 0, y: 0 })
+  const parent = b.node('scene.object', { rotY: 0 }, { x: 240, y: 0 })
+
+  b.connect(group, 'out', parent, 'in')
+  b.exposeInput(group, 'children', 'Objekter')
+  b.exposeOutput(parent, 'out', 'Gruppe')
+
+  return withDefaultSources(
+    b.build(
+      '3D-gruppe',
+      'Samler objekter til én enhet. Flytt, roter og skaler hele gruppen med Objekt-noden.',
+      '3D',
+    ),
+  )
+}
+
 export const BUILTIN_BLOCKS: BlockTemplate[] = [
   generativeBakgrunn(),
   rasterBehandling(),
   treDForm(),
+  treDScene(),
+  treDGruppe(),
   loopAnimertForvrengning(),
   lagstabelMal(),
   smudgeGlass(),

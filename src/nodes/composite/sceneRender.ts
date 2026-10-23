@@ -1,5 +1,6 @@
 import type { NodeDefinition } from '../../engine/types'
 import type { Object3DValue } from '../../render/three/object3d'
+import type { CameraValue, LightsValue } from '../../render/three/sceneValues'
 
 export interface SceneRenderParams {
   cameraDistance: number
@@ -25,7 +26,11 @@ export const sceneRender: NodeDefinition<SceneRenderParams> = {
   category: 'composite',
   description:
     'Maler 3D-objekter ned på et lerret. Bruk den for å blande 3D med 2D-lag.',
-  inputs: [{ id: 'in', label: 'Objekter', type: 'object3d', multiple: true }],
+  inputs: [
+    { id: 'in', label: 'Objekter', type: 'object3d', multiple: true },
+    { id: 'camera', label: 'Kamera', type: 'camera', optional: true },
+    { id: 'lights', label: 'Belysning', type: 'lights', optional: true },
+  ],
   outputs: [{ id: 'out', label: 'Raster', type: 'canvas' }],
   params: [
     { key: 'cameraDistance', label: 'Kameraavstand', type: 'number', default: 4, min: 0.5, max: 30, step: 0.1, animatable: true },
@@ -34,9 +39,13 @@ export const sceneRender: NodeDefinition<SceneRenderParams> = {
     { key: 'background', label: 'Bakgrunn', type: 'color', default: '#000000' },
     { key: 'ambient', label: 'Omgivelseslys', type: 'number', default: 1.2, min: 0, max: 4, step: 0.05 },
     { key: 'directional', label: 'Retningslys', type: 'number', default: 2, min: 0, max: 6, step: 0.05 },
-    { key: 'spin', label: 'Automatisk rotasjon', type: 'number', default: 0, min: -4, max: 4, step: 0.05, animatable: true },
+    {
+      key: 'spin', label: 'Rotasjon per loop', type: 'int', default: 0, min: -4, max: 4,
+      // Hele omdreininger: en halv omdreining ville ikke lukket loopen.
+      animatable: true,
+    },
   ],
-  async evaluate(ctx, { in: objects }, p) {
+  async evaluate(ctx, { in: objects, camera, lights }, p) {
     const target = ctx.render.canvas(ctx.scopeKey)
     const list = (Array.isArray(objects) ? objects : objects ? [objects] : []) as Object3DValue[]
 
@@ -60,6 +69,8 @@ export const sceneRender: NodeDefinition<SceneRenderParams> = {
       ambient: Number(p.ambient),
       directional: Number(p.directional),
       spin: Number(p.spin),
+      camera: camera as CameraValue | undefined,
+      lights: lights as LightsValue | undefined,
     }, ctx.phase)
 
     const c = target.ctx
