@@ -32,12 +32,28 @@ export function toObject3D(value: Object3DValue): THREE.Object3D {
   return object
 }
 
-function materialFor(value: Object3DValue): THREE.MeshStandardMaterial {
+function materialFor(value: Object3DValue): THREE.Material {
+  const transparent = value.opacity < 1
+  if (value.shading === 'wireframe') {
+    return new THREE.MeshBasicMaterial({
+      color: new THREE.Color(value.color),
+      wireframe: true,
+      transparent,
+      opacity: value.opacity,
+    })
+  }
+  if (value.shading === 'normals') {
+    return new THREE.MeshNormalMaterial({
+      flatShading: false,
+      transparent,
+      opacity: value.opacity,
+    })
+  }
   return new THREE.MeshStandardMaterial({
     color: new THREE.Color(value.color),
     roughness: value.roughness,
     metalness: value.metalness,
-    transparent: value.opacity < 1,
+    transparent,
     opacity: value.opacity,
     emissive: new THREE.Color(value.emissive),
   })

@@ -13,6 +13,8 @@ import { trail } from './modifier/trail'
 import { transform3D } from './modifier/transform3D'
 import { raster } from './modifier/raster'
 import { blurNode, pixelateNode, warpNode } from './modifier/pixelNodes'
+import { grade } from './modifier/grade'
+import { bloom } from './modifier/bloom'
 import { blend } from './composite/blend'
 import { stack } from './composite/stack'
 import { sceneRender } from './composite/sceneRender'
@@ -47,6 +49,8 @@ export const registry = new NodeRegistry().registerAll([
   blurNode,
   pixelateNode,
   warpNode,
+  bloom,
+  grade,
   // Kompositt
   blend,
   stack,

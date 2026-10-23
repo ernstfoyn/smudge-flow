@@ -1,8 +1,7 @@
 import * as THREE from 'three'
 import { lookPreamble, postVertexShader } from '../shaders/looks'
 
-export interface PostOptions {
-  /** GLOW-koden for effekten (uten preamble). */
+export interface PostOptions {  /** GLOW-koden for effekten (uten preamble). */
   glsl: string
   /**
    * Sant hvis `glsl` er en komplett fragment-shader, med egen main().
@@ -19,6 +18,17 @@ export interface PostOptions {
   uniforms?: Record<string, number | [number, number]>
   /** Ekstra farge-uniformer. */
   colors?: Record<string, string>
+}
+
+/**
+ * Tom tekstur for generatorer som ikke har noen inngang.
+ * En 1×1-lerret er nok: shaderen sampler den aldri.
+ */
+function blankCanvas(): HTMLCanvasElement {
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+  return canvas
 }
 
 /**
@@ -47,7 +57,8 @@ export class PostProcess {
     })
     this.renderer.setPixelRatio(1)
 
-    this.texture = new THREE.Texture()
+    this.texture = new THREE.Texture(blankCanvas())
+    this.texture.needsUpdate = true
     this.texture.minFilter = THREE.LinearFilter
     this.texture.magFilter = THREE.LinearFilter
     this.texture.generateMipmaps = false
@@ -135,11 +146,15 @@ void main() {
   }
 
   /** Kjører et pass og returnerer resultatet i et lerret. */
-  render(input: CanvasImageSource, options: PostOptions): HTMLCanvasElement {
+  render(input: CanvasImageSource | null, options: PostOptions): HTMLCanvasElement {
     this.resize(this.width, this.height)
 
-    this.texture.image = input as TexImageSource
-    this.texture.needsUpdate = true
+    // Generatorer (støy, celler) har ingen inngang. Da beholder vi den
+    // tomme 1×1-teksturen, som shaderen uansett ikke sampler.
+    if (input) {
+      this.texture.image = input as TexImageSource
+      this.texture.needsUpdate = true
+    }
 
     const material = this.materialFor(options.glsl, !!options.custom)
     material.uniforms.uAmount.value = options.amount

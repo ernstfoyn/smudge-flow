@@ -110,7 +110,7 @@ export class BrowserRenderServices implements RenderServices {
    * Alle effektnoder deler én WebGL-kontekst. Nettleserne begrenser
    * antallet levende kontekster, så dette må ikke lages per node.
    */
-  async post(input: CanvasImageSource, options: PostOptions): Promise<HTMLCanvasElement> {
+  async post(input: CanvasImageSource | null, options: PostOptions): Promise<HTMLCanvasElement> {
     if (!this.postModule) {
       this.postModule = import('./three/postProcess')
     }

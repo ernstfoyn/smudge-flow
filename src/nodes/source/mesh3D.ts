@@ -1,6 +1,7 @@
 import type { BufferGeometry } from 'three'
 import type { NodeDefinition } from '../../engine/types'
-import { identityTransform, type Object3DValue } from '../../render/three/object3d'
+import { identityTransform, type Object3DValue, type ShadingMode } from '../../render/three/object3d'
+import { MESH_SHAPES, type MeshShape } from '../../render/three/meshShapes'
 
 export interface Mesh3DParams {
   shape: string
@@ -11,6 +12,7 @@ export interface Mesh3DParams {
   opacity: number
   emissive: string
   segments: number
+  shading: string
 }
 
 /**
@@ -31,17 +33,18 @@ export const mesh3D: NodeDefinition<Mesh3DParams> = {
   params: [
     {
       key: 'shape', label: 'Form', type: 'enum', default: 'torus',
-      options: [
-        { value: 'box', label: 'Boks' },
-        { value: 'sphere', label: 'Kule' },
-        { value: 'torus', label: 'Torus' },
-        { value: 'plane', label: 'Plan' },
-        { value: 'cylinder', label: 'Sylinder' },
-        { value: 'icosahedron', label: 'Ikosaeder' },
-      ],
+      options: MESH_SHAPES.map((shape) => ({ value: shape.id, label: shape.label })),
     },
     { key: 'size', label: 'Størrelse', type: 'number', default: 0.5, min: 0.05, max: 4, step: 0.01 },
     { key: 'segments', label: 'Segmenter', type: 'int', default: 8, min: 3, max: 48 },
+    {
+      key: 'shading', label: 'Materialmodus', type: 'enum', default: 'standard',
+      options: [
+        { value: 'standard', label: 'Standard' },
+        { value: 'wireframe', label: 'Wireframe' },
+        { value: 'normals', label: 'Normaler' },
+      ],
+    },
     { key: 'color', label: 'Farge', type: 'color', default: '#b9ff66' },
     { key: 'roughness', label: 'Ruheit', type: 'number', default: 0.4, min: 0, max: 1, step: 0.01 },
     { key: 'metalness', label: 'Metallhet', type: 'number', default: 0.2, min: 0, max: 1, step: 0.01 },
@@ -58,7 +61,7 @@ export const mesh3D: NodeDefinition<Mesh3DParams> = {
 
     if (!geometry || cachedKey !== cacheKey) {
       geometry?.dispose()
-      geometry = buildGeometry(p.shape as never, Number(p.size), Number(p.segments))
+      geometry = buildGeometry(p.shape as MeshShape, Number(p.size), Number(p.segments))
       ctx.nodeCache.set('geometry', geometry)
       ctx.nodeCache.set('geometryKey', cacheKey)
     }
@@ -70,6 +73,7 @@ export const mesh3D: NodeDefinition<Mesh3DParams> = {
       metalness: Number(p.metalness),
       opacity: Number(p.opacity),
       emissive: String(p.emissive),
+      shading: String(p.shading ?? 'standard') as ShadingMode,
       transform: identityTransform(),
     }
 

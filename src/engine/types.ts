@@ -232,7 +232,8 @@ export interface RenderServices {
    * Fullskjerm-postprosessering av et raster-lerret.
    * Alle effektnoder deler én GPU-kontekst gjennom denne.
    */
-  post(input: CanvasImageSource, options: PostOptions): Promise<HTMLCanvasElement>
+  /** Fullskjerm-postprosessering. `input: null` brukes av rene generatorer. */
+  post(input: CanvasImageSource | null, options: PostOptions): Promise<HTMLCanvasElement>
   assets: {
     image(src: string): Promise<HTMLImageElement>
     /** Deterministisk: seeker og venter på 'seeked' per frame. */

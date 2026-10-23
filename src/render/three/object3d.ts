@@ -21,6 +21,18 @@ export interface Transform3D {
   scale: { x: number; y: number; z: number }
 }
 
+/**
+ * Materialmodus.
+ *
+ * 'standard'  = vanlig PBR (standardvalget)
+ * 'wireframe' = bare kantene, nyttig for teknisk look
+ * 'normals'   = normalene som farge, for å se geometrien
+ *
+ * De to siste er hentet fra vgpu/render/inspect (wireframe- og
+ * normal-debug-materialene).
+ */
+export type ShadingMode = 'standard' | 'wireframe' | 'normals'
+
 export interface Object3DValue {
   /** Tom for grupper (som bare har barn). */
   geometry?: BufferGeometry
@@ -29,6 +41,8 @@ export interface Object3DValue {
   metalness: number
   opacity: number
   emissive: string
+  /** Materialmodus. Standard når den mangler. */
+  shading?: ShadingMode
   transform: Transform3D
   /** Skjult uten å fjerne objektet (kan animeres). */
   visible?: boolean
