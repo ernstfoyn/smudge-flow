@@ -10,10 +10,20 @@ import {
   type EdgeChange,
   type Node,
   type NodeChange,
+  type OnConnectStart,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useGraphStore } from '../state/useGraphStore'
+import { useConnectionDrag } from '../state/useConnectionDrag'
+import {
+  PARAM_PORT_PREFIX,
+  canConnectTypes,
+  nodeParamDefs,
+  nodePorts,
+} from '../engine/graph'
 import { NodeCard } from './nodes/NodeCard'
+import { PortLegend } from './PortLegend'
+import { PARAM_META, portMeta } from './portStyle'
 
 const nodeTypes = { card: NodeCard }
 
@@ -30,7 +40,12 @@ function FlowInner() {
   const setSelectedEdges = useGraphStore((s) => s.setSelectedEdges)
   const groupSelection = useGraphStore((s) => s.groupSelection)
   const saveSelectionAsBlock = useGraphStore((s) => s.saveSelectionAsBlock)
+  const drag = useConnectionDrag((s) => s.drag)
+  const startDrag = useConnectionDrag((s) => s.start)
+  const endDrag = useConnectionDrag((s) => s.end)
   const reactFlow = useReactFlow()
+
+  useEffect(() => () => useConnectionDrag.getState().end(), [])
 
   const nodes: Node[] = useMemo(
     () =>
@@ -44,24 +59,41 @@ function FlowInner() {
     [graph.nodes, selection],
   )
 
-  const edges: Edge[] = useMemo(
-    () =>
-      graph.edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        sourceHandle: e.sourcePort,
-        target: e.target,
-        targetHandle: e.targetPort,
-        selected: selectedEdges.includes(e.id),
-        animated: e.kind === 'param',
+  const edges: Edge[] = useMemo(() => {
+    const byId = new Map(graph.nodes.map((node) => [node.id, node]))
+
+    return graph.edges.map((edge) => {
+      let stroke = '#a3e635'
+
+      if (edge.kind === 'param') {
+        stroke = PARAM_META.color
+      } else {
+        const source = byId.get(edge.source)
+        const port = source
+          ? nodePorts(source).outputs.find((p) => p.id === edge.sourcePort)
+          : undefined
+        if (port) stroke = portMeta(port.type).color
+      }
+
+      const isSelected = selectedEdges.includes(edge.id)
+
+      return {
+        id: edge.id,
+        source: edge.source,
+        sourceHandle: edge.sourcePort,
+        target: edge.target,
+        targetHandle: edge.targetPort,
+        selected: isSelected,
+        animated: edge.kind === 'param',
         style: {
-          stroke: e.kind === 'param' ? '#c084fc' : '#a3e635',
-          strokeWidth: e.kind === 'param' ? 1.4 : 1.6,
-          strokeDasharray: e.kind === 'param' ? '4 3' : undefined,
+          stroke,
+          strokeWidth: isSelected ? 3 : edge.kind === 'param' ? 1.6 : 1.8,
+          strokeDasharray: edge.kind === 'param' ? '4 3' : undefined,
+          filter: isSelected ? `drop-shadow(0 0 3px ${stroke})` : undefined,
         },
-      })),
-    [graph.edges, selectedEdges],
-  )
+      }
+    })
+  }, [graph.edges, graph.nodes, selectedEdges])
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -111,6 +143,100 @@ function FlowInner() {
     [connect],
   )
 
+  /** Finner porttypen draget starter fra, slik at nodekortene kan lyse opp riktig. */
+  const onConnectStart: OnConnectStart = useCallback(
+    (_event, params) => {
+      if (!params.nodeId || !params.handleId || !params.handleType) return
+      const node = useGraphStore.getState().graph.nodes.find((n) => n.id === params.nodeId)
+      if (!node) return
+
+      const ports = nodePorts(node)
+
+      if (params.handleType === 'source') {
+        const port = ports.outputs.find((p) => p.id === params.handleId)
+        if (!port) return
+        startDrag({
+          nodeId: node.id,
+          portId: params.handleId,
+          direction: 'source',
+          type: port.type,
+        })
+        return
+      }
+
+      if (params.handleId.startsWith(PARAM_PORT_PREFIX)) {
+        const key = params.handleId.slice(PARAM_PORT_PREFIX.length)
+        const param = nodeParamDefs(node).find((p) => p.key === key)
+        if (!param) return
+        startDrag({
+          nodeId: node.id,
+          portId: params.handleId,
+          direction: 'target',
+          type: 'number',
+          isParam: true,
+        })
+        return
+      }
+
+      const port = ports.inputs.find((p) => p.id === params.handleId)
+      if (!port) return
+      startDrag({
+        nodeId: node.id,
+        portId: params.handleId,
+        direction: 'target',
+        type: port.type,
+      })
+    },
+    [startDrag],
+  )
+
+  const onConnectEnd = useCallback(() => endDrag(), [endDrag])
+
+  /**
+   * React Flow spør før en kobling fullføres. Da får brukeren «ulovlig»-markør
+   * på feil typer, og vi slipper å lage kanter som butikken uansett avviser.
+   */
+  const isValidConnection = useCallback((connection: Edge | Connection) => {
+    if (!connection.source || !connection.target) return false
+    if (connection.source === connection.target) return false
+
+    const { graph } = useGraphStore.getState()
+    const sourceNode = graph.nodes.find((n) => n.id === connection.source)
+    const targetNode = graph.nodes.find((n) => n.id === connection.target)
+    if (!sourceNode || !targetNode) return false
+
+    const sourcePort = nodePorts(sourceNode).outputs.find(
+      (p) => p.id === connection.sourceHandle,
+    )
+    if (!sourcePort) return false
+
+    const targetHandle = connection.targetHandle ?? 'in'
+    if (targetHandle.startsWith(PARAM_PORT_PREFIX)) {
+      const key = targetHandle.slice(PARAM_PORT_PREFIX.length)
+      const param = nodeParamDefs(targetNode).find((p) => p.key === key)
+      return (
+        sourcePort.type === 'number' &&
+        !!param &&
+        (param.type === 'number' || param.type === 'int')
+      )
+    }
+
+    const targetPort = nodePorts(targetNode).inputs.find((p) => p.id === targetHandle)
+    return !!targetPort && canConnectTypes(sourcePort.type, targetPort.type)
+  }, [])
+
+  const connectionLineStyle = useMemo(
+    () =>
+      drag
+        ? {
+            stroke: drag.isParam ? PARAM_META.color : portMeta(drag.type).color,
+            strokeWidth: 2,
+            strokeDasharray: drag.isParam ? '4 3' : undefined,
+          }
+        : undefined,
+    [drag],
+  )
+
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault()
@@ -155,7 +281,11 @@ function FlowInner() {
   }, [])
 
   return (
-    <div className="h-full w-full" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
+    <div
+      className="relative h-full w-full"
+      onDrop={onDrop}
+      onDragOver={(e) => e.preventDefault()}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -163,6 +293,10 @@ function FlowInner() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
+        isValidConnection={isValidConnection}
+        connectionLineStyle={connectionLineStyle}
         deleteKeyCode={null}
         multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
         fitView
@@ -183,6 +317,26 @@ function FlowInner() {
           nodeBorderRadius={3}
         />
       </ReactFlow>
+
+      <PortLegend />
+
+      {drag && (
+        <div className="pointer-events-none absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/95 px-3 py-1.5 text-[10px] text-zinc-300 shadow-xl backdrop-blur">
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{
+              background: drag.isParam ? PARAM_META.color : portMeta(drag.type).color,
+            }}
+          />
+          <span className="whitespace-nowrap">
+            Slipp på en {drag.direction === 'source' ? 'inngang' : 'utgang'} med{' '}
+            <strong className="font-semibold text-zinc-100">
+              {drag.isParam ? 'Tall' : portMeta(drag.type).label}
+            </strong>
+          </span>
+          <span className="hidden text-zinc-500 sm:inline">· like farger</span>
+        </div>
+      )}
 
       {selection.length > 0 && (
         <div className="absolute left-3 top-3 flex items-center gap-2">
@@ -211,7 +365,7 @@ function FlowInner() {
       )}
 
       <span className="pointer-events-none absolute bottom-2 left-2 text-[10px] text-zinc-600">
-        Dra noder fra paletten hitte · Shift-klikk for å merke flere · Delete fjerner valgte noder og koblinger
+        Dra noder fra paletten hit · Shift-klikk for å merke flere · Delete fjerner valgte noder og koblinger
       </span>
     </div>
   )

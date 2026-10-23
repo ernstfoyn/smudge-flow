@@ -67,6 +67,30 @@ CPU, og 3D er bare én renderer-plugin.
 `composite.sceneRender` maler 3D-objekter ned på et raster-lerret. Da kan 3D
 blandes med 2D-lag, rastereffekter og eksporteres som vanlig.
 
+### Fargekoder i grensesnittet
+
+Alle porter farges etter verditype. Regelen er at to porter kan kobles sammen
+hvis de har samme farge. `canvas` og `drawable` deler derfor farge, siden de er
+de eneste krysskompatible typene.
+
+| Farge | Verditype | Vises som |
+|---|---|---|
+| `#a3e635` | `canvas`, `drawable` | Bilde |
+| `#fb923c` | `object3d` | 3D-objekt |
+| `#60a5fa` | `number` | Tall |
+| `#c084fc` | `camera` | Kamera |
+| `#facc15` | `lights` | Lys |
+
+Parameterinnganger er også tall (blå), men tegnes som en **diamant** og får
+stiplede kanter. Når brukeren drar en kobling, dempes alle porter som ikke
+passer, mens kompatible mål lyser. En liten fargeforklaring ligger oppå
+lerretet og kan skjules.
+
+Nodekortet viser en type-chip på hver port, og kantene arver fargen fra
+kildeporten. Sidepanelene er delt i sammenleggbare seksjoner, og nodepaletten
+har søk. Åpen/lukket-tilstand huskes i `localStorage` under
+`smudgeflow.ui.open.*`.
+
 ---
 
 ## 3. Gjenbrukbare workflows: gruppe-noder
@@ -175,7 +199,7 @@ et sirkulært gitter).
 ### Parameter-koblinger
 
 En node kan styre en parameter i en annen node. I UI-et: dra fra en
-tallutgang til det lille håndtaket ved parameteren i nodekortet.
+tallutgang til den blå diamanten ved parameteren i nodekortet.
 
 ```
 source.loop ──value──▶ modifier.raster.param:cellSize

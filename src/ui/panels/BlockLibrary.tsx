@@ -4,6 +4,7 @@ import { useLibraryStore } from '../../state/useLibraryStore'
 import { useGraphStore } from '../../state/useGraphStore'
 import { BUILTIN_BLOCKS } from '../../blocks/builtins'
 import type { BlockTemplate } from '../../blocks/types'
+import { CollapsibleSection } from '../primitives/CollapsibleSection'
 
 /**
  * Blokk-biblioteket.
@@ -108,10 +109,11 @@ export function BlockLibrary() {
 
   return (
     <div className="flex flex-col gap-4 p-3">
-      <section>
-        <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-          Innebygde oppsett
-        </h3>
+      <CollapsibleSection
+        id="blocks.builtin"
+        title="Innebygde oppsett"
+        badge={BUILTIN_BLOCKS.length}
+      >
         <ul className="flex flex-col gap-1.5">
           {BUILTIN_BLOCKS.map((block) =>
             renderBlock(
@@ -127,13 +129,13 @@ export function BlockLibrary() {
             ),
           )}
         </ul>
-      </section>
+      </CollapsibleSection>
 
-      <section>
-        <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-          Mine blokker
-        </h3>
-
+      <CollapsibleSection
+        id="blocks.mine"
+        title="Mine blokker"
+        badge={userBlocks.length}
+      >
         {userBlocks.length === 0 ? (
           <p className="rounded-lg border border-dashed border-zinc-800 p-2 text-[11px] leading-relaxed text-zinc-600">
             Ingen lagrede blokker ennå. Marker noder i grafen og trykk «⬚ Lag
@@ -183,8 +185,14 @@ export function BlockLibrary() {
         >
           ⬆ Importer blokk fra fil
         </button>
-        <input ref={fileRef} type="file" accept="application/json,.json" onChange={onImport} className="hidden" />
-      </section>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={onImport}
+          className="hidden"
+        />
+      </CollapsibleSection>
 
       {pending && (
         <div

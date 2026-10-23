@@ -37,9 +37,68 @@ body {
     box-shadow 120ms ease;
 }
 
-.react-flow__handle:hover {
-  transform: scale(1.5);
-  box-shadow: 0 0 0 3px rgb(163 230 53 / 25%);
+/* Porter: farge = verditype. Kompatible mål lyser opp under en kobling. */
+.react-flow__handle.smudge-port {
+  cursor: crosshair;
+  transition:
+    box-shadow 140ms ease,
+    opacity 140ms ease,
+    scale 140ms ease,
+    filter 140ms ease;
+}
+
+.react-flow__handle.smudge-port:hover {
+  scale: 1.45;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--port-color, #a3e635) 30%, transparent);
+  filter: brightness(1.15);
+}
+
+.react-flow__handle.smudge-port--multi {
+  box-shadow:
+    0 0 0 2px #09090b,
+    0 0 0 4px color-mix(in srgb, var(--port-color, #a3e635) 30%, transparent);
+}
+
+.react-flow__handle.smudge-port--param {
+  border-radius: 2px;
+  rotate: 45deg;
+}
+
+.react-flow__handle.smudge-port--param:hover {
+  scale: 1.3;
+}
+
+.react-flow__handle.smudge-port--origin {
+  scale: 1.2;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--port-color, #a3e635) 38%, transparent),
+    0 0 16px color-mix(in srgb, var(--port-color, #a3e635) 55%, transparent);
+}
+
+.react-flow__handle.smudge-port--compatible {
+  scale: 1.2;
+  animation: smudge-port-glow 1.4s ease-in-out infinite;
+}
+
+.react-flow__handle.smudge-port--incompatible,
+.react-flow__handle.smudge-port--muted {
+  opacity: 0.22;
+  filter: saturate(0.25);
+  cursor: not-allowed;
+}
+
+@keyframes smudge-port-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--port-color, #a3e635) 35%, transparent),
+      0 0 8px color-mix(in srgb, var(--port-color, #a3e635) 40%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px color-mix(in srgb, var(--port-color, #a3e635) 12%, transparent),
+      0 0 18px color-mix(in srgb, var(--port-color, #a3e635) 65%, transparent);
+  }
 }
 
 .react-flow__edge-path {

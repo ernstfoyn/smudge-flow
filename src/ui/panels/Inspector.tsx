@@ -5,9 +5,11 @@ import { nodeParamDefs, nodePorts } from '../../engine/graph'
 import { useGraphStore } from '../../state/useGraphStore'
 import { usePlaybackStore } from '../../state/usePlaybackStore'
 import { ParamField } from '../primitives/Fields'
+import { CollapsibleSection } from '../primitives/CollapsibleSection'
 import { TrailPad } from './TrailPad'
 import { WAVEFORMS } from '../../engine/animation/lfo'
 import { STACK_MODES, type StackMode } from '../../nodes/composite/stack'
+import { PARAM_META, portMeta } from '../portStyle'
 
 /** Filvelger som leser filen inn som data-URL. */
 function FileField({
@@ -99,9 +101,12 @@ export function Inspector() {
   const isGroup = node.type === 'group'
   const def = isGroup ? null : registry.get(node.type)
   const params = def?.params ?? []
+  const editableParams = params.filter((p) => p.type !== 'layers')
 
   /** Lagene som er koblet til en multiple-port, i tegnerrekkefølge. */
-  const layerPorts = nodePorts(node).inputs.filter((p) => p.multiple)
+  const nodePortDefs = nodePorts(node)
+  const layerPorts = nodePortDefs.inputs.filter((p) => p.multiple)
+  const outputPorts = nodePortDefs.outputs
 
   /** Alle koblinger inn og ut av noden. */
   const incoming = graph.edges.filter((e) => e.target === node.id)
@@ -110,7 +115,7 @@ export function Inspector() {
   if (isGroup) {
     return (
       <div className="flex flex-col gap-4 p-3">
-        <header className="flex items-center justify-between gap-2">
+        <header className="sticky top-0 z-20 -mx-3 -mt-3 flex items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950/95 px-3 py-2 backdrop-blur">
           <div>
             <h2 className="text-[13px] font-semibold text-zinc-100">{node.title}</h2>
             <p className="text-[10px] text-zinc-500">
@@ -131,10 +136,11 @@ export function Inspector() {
           inngangene, og kopier gruppen for å bruke samme behandling på nytt innhold.
         </p>
 
-        <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
-          <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-            Eksponerte innganger
-          </h3>
+        <CollapsibleSection
+          id="inspector.group.inputs"
+          title="Eksponerte innganger"
+          badge={node.group?.inputs.length ?? 0}
+        >
           {node.group?.inputs.length ? (
             <ul className="flex flex-col gap-1">
               {node.group.inputs.map((input) => {
@@ -146,7 +152,14 @@ export function Inspector() {
                     key={input.id}
                     className="flex items-center justify-between gap-1 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px]"
                   >
-                    <span className="truncate text-zinc-300">{input.name}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span
+                        aria-hidden
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ background: portMeta(input.type).color }}
+                      />
+                      <span className="truncate text-zinc-300">{input.name}</span>
+                    </span>
                     <span className={count ? 'text-[10px] text-lime-300' : 'text-[10px] text-zinc-600'}>
                       {count ? `${count} koblet` : 'ikke koblet'}
                     </span>
@@ -168,12 +181,13 @@ export function Inspector() {
               hvilket som helst innhold inn i gruppen.
             </p>
           )}
-        </section>
+        </CollapsibleSection>
 
-        <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
-          <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-            Eksponerte utganger
-          </h3>
+        <CollapsibleSection
+          id="inspector.group.outputs"
+          title="Eksponerte utganger"
+          badge={node.group?.outputs.length ?? 0}
+        >
           {node.group?.outputs.length ? (
             <ul className="flex flex-col gap-1">
               {node.group.outputs.map((output) => (
@@ -181,7 +195,14 @@ export function Inspector() {
                   key={output.id}
                   className="flex items-center justify-between gap-1 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px] text-zinc-300"
                 >
-                  <span className="truncate">{output.name}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      aria-hidden
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: portMeta(output.type).color }}
+                    />
+                    <span className="truncate">{output.name}</span>
+                  </span>
                   <button
                     type="button"
                     title="Fjern utgang"
@@ -196,22 +217,38 @@ export function Inspector() {
           ) : (
             <p className="text-[11px] text-zinc-600">Ingen eksponerte utganger.</p>
           )}
-        </section>
+        </CollapsibleSection>
 
         {node.group && node.group.edges.length > 0 && (
-          <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
-            <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-              Interne koblinger
-            </h3>
+          <CollapsibleSection
+            id="inspector.group.edges"
+            title="Interne koblinger"
+            badge={node.group.edges.length}
+          >
             <ul className="flex flex-col gap-1">
               {node.group.edges.map((edge) => {
-                const from = node.group?.nodes.find((n) => n.id === edge.source)?.title ?? edge.source
+                const sourceNode = node.group?.nodes.find((n) => n.id === edge.source)
+                const sourcePort = sourceNode
+                  ? nodePorts(sourceNode).outputs.find((p) => p.id === edge.sourcePort)
+                  : undefined
+                const color =
+                  edge.kind === 'param'
+                    ? PARAM_META.color
+                    : sourcePort
+                      ? portMeta(sourcePort.type).color
+                      : '#71717a'
+                const from = sourceNode?.title ?? edge.source
                 const to = node.group?.nodes.find((n) => n.id === edge.target)?.title ?? edge.target
                 return (
                   <li
                     key={edge.id}
                     className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px]"
                   >
+                    <span
+                      aria-hidden
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: color }}
+                    />
                     <span className="min-w-0 flex-1 truncate text-zinc-400">
                       {from} → {to}
                     </span>
@@ -227,13 +264,14 @@ export function Inspector() {
                 )
               })}
             </ul>
-          </section>
+          </CollapsibleSection>
         )}
 
-        <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
-          <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-            Innhold · eksponer porter
-          </h3>
+        <CollapsibleSection
+          id="inspector.group.content"
+          title="Innhold · eksponer porter"
+          badge={node.group?.nodes.length ?? 0}
+        >
           <ul className="flex flex-col gap-1.5">
             {node.group?.nodes.map((inner) => {
               const ports = nodePorts(inner)
@@ -252,7 +290,14 @@ export function Inspector() {
                   <div className="mt-1 flex flex-col gap-1">
                     {ports.inputs.map((port) => (
                       <div key={port.id} className="flex items-center justify-between gap-1">
-                        <span className="truncate text-[10px] text-zinc-500">→ {port.label}</span>
+                        <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-[10px] text-zinc-500">
+                          <span
+                            aria-hidden
+                            className="h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ background: portMeta(port.type).color }}
+                          />
+                          → {port.label}
+                        </span>
                         {exposedIn.has(`${inner.id}.${port.id}`) ? (
                           <span className="text-[9px] text-lime-400">eksponert</span>
                         ) : (
@@ -268,7 +313,14 @@ export function Inspector() {
                     ))}
                     {ports.outputs.map((port) => (
                       <div key={port.id} className="flex items-center justify-between gap-1">
-                        <span className="truncate text-[10px] text-zinc-500">← {port.label}</span>
+                        <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-[10px] text-zinc-500">
+                          <span
+                            aria-hidden
+                            className="h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ background: portMeta(port.type).color }}
+                          />
+                          ← {port.label}
+                        </span>
                         {exposedOut.has(`${inner.id}.${port.id}`) ? (
                           <span className="text-[9px] text-lime-400">eksponert</span>
                         ) : (
@@ -287,7 +339,7 @@ export function Inspector() {
               )
             })}
           </ul>
-        </section>
+        </CollapsibleSection>
 
         <div className="flex flex-wrap gap-2">
           <button
@@ -311,7 +363,7 @@ export function Inspector() {
 
   return (
     <div className="flex flex-col gap-4 p-3">
-      <header className="flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-20 -mx-3 -mt-3 flex items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950/95 px-3 py-2 backdrop-blur">
         <div>
           <h2 className="text-[13px] font-semibold text-zinc-100">{node.title}</h2>
           <p className="text-[10px] text-zinc-500">{node.type}</p>
@@ -365,11 +417,14 @@ export function Inspector() {
         }
 
         return (
-          <section key={port.id} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
-            <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-              {port.label} · {edges.length} {layersParam ? 'lag' : 'elementer'}
-            </h3>
-
+          <CollapsibleSection
+            key={port.id}
+            id={`inspector.layer.${port.id}`}
+            title={port.label}
+            badge={`${edges.length} ${layersParam ? 'lag' : 'elementer'}`}
+            accent={portMeta(port.type).color}
+            className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2"
+          >
             {edges.length === 0 && (
               <p className="text-[11px] text-zinc-600">Ingen lag koblet ennå.</p>
             )}
@@ -485,187 +540,223 @@ export function Inspector() {
                 ? 'Lag 1 er bunnen. Hvert lag har egen modus, dekkevne og synlighet.'
                 : 'Rekkefølgen er uten betydning for 3D (dybden avgjør), men brukes av gruppen.'}
             </p>
-          </section>
+          </CollapsibleSection>
         )
       })}
 
       {node.type === 'modifier.trail' && <TrailPad nodeId={node.id} />}
 
-      {params.length === 0 && (
-        <p className="text-[11px] text-zinc-500">Denne noden har ingen parametere.</p>
-      )}
-
       {/* Koblinger: en synlig måte å koble fra, uten å være avhengig av Delete-tasten. */}
       {incoming.length + outgoing.length > 0 && (
-        <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
-          <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-            Koblinger
-          </h3>
+        <CollapsibleSection
+          id="inspector.connections"
+          title="Koblinger"
+          badge={incoming.length + outgoing.length}
+          className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2"
+        >
           <ul className="flex flex-col gap-1">
-            {incoming.map((edge) => (
-              <li
-                key={edge.id}
-                className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px]"
-              >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500" />
-                <span className="min-w-0 flex-1 truncate text-zinc-300">
-                  fra <span className="text-zinc-400">{nodeTitle(graph, edge.source)}</span>
-                  {edge.kind === 'param' && (
-                    <span className="ml-1 text-[10px] text-fuchsia-300">
-                      → {paramLabel(node, edge.targetParam)} (parameter)
-                    </span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  title="Koble fra"
-                  onClick={() => disconnect(edge.id)}
-                  className="shrink-0 rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
+            {incoming.map((edge) => {
+              const sourceNode = graph.nodes.find((n) => n.id === edge.source)
+              const sourcePort = sourceNode
+                ? nodePorts(sourceNode).outputs.find((p) => p.id === edge.sourcePort)
+                : undefined
+              const color =
+                edge.kind === 'param'
+                  ? PARAM_META.color
+                  : sourcePort
+                    ? portMeta(sourcePort.type).color
+                    : '#71717a'
+
+              return (
+                <li
+                  key={edge.id}
+                  className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px]"
                 >
-                  ✕
-                </button>
-              </li>
-            ))}
-            {outgoing.map((edge) => (
-              <li
-                key={edge.id}
-                className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px]"
-              >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-lime-400" />
-                <span className="min-w-0 flex-1 truncate text-zinc-300">
-                  til <span className="text-zinc-400">{nodeTitle(graph, edge.target)}</span>
-                </span>
-                <button
-                  type="button"
-                  title="Koble fra"
-                  onClick={() => disconnect(edge.id)}
-                  className="shrink-0 rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
+                  <span
+                    aria-hidden
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ background: color }}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-zinc-300">
+                    fra <span className="text-zinc-400">{nodeTitle(graph, edge.source)}</span>
+                    {edge.kind === 'param' && (
+                      <span className="ml-1 text-[10px]" style={{ color: PARAM_META.color }}>
+                        → {paramLabel(node, edge.targetParam)} (parameter)
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    title="Koble fra"
+                    onClick={() => disconnect(edge.id)}
+                    className="shrink-0 rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
+                  >
+                    ✕
+                  </button>
+                </li>
+              )
+            })}
+            {outgoing.map((edge) => {
+              const sourcePort = outputPorts.find((p) => p.id === edge.sourcePort)
+              const color = sourcePort ? portMeta(sourcePort.type).color : '#71717a'
+              return (
+                <li
+                  key={edge.id}
+                  className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px]"
                 >
-                  ✕
-                </button>
-              </li>
-            ))}
+                  <span
+                    aria-hidden
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ background: color }}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-zinc-300">
+                    til <span className="text-zinc-400">{nodeTitle(graph, edge.target)}</span>
+                  </span>
+                  <button
+                    type="button"
+                    title="Koble fra"
+                    onClick={() => disconnect(edge.id)}
+                    className="shrink-0 rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
+                  >
+                    ✕
+                  </button>
+                </li>
+              )
+            })}
           </ul>
           <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
             Du kan også merke en kobling i grafen og trykke Delete.
           </p>
-        </section>
+        </CollapsibleSection>
       )}
 
-      {params.filter((p) => p.type !== 'layers').map((p) => {
-        const value = node.params[p.key] ?? p.default
-        const lfo = node.lfo?.[p.key]
-        const hasKeys = (node.tracks?.[p.key]?.length ?? 0) > 0
+      {editableParams.length > 0 ? (
+        <CollapsibleSection
+          id="inspector.params"
+          title="Parametere"
+          badge={editableParams.length}
+          accent={PARAM_META.color}
+          className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2"
+          bodyClassName="flex flex-col gap-3"
+        >
+          {editableParams.map((p) => {
+            const value = node.params[p.key] ?? p.default
+            const lfo = node.lfo?.[p.key]
+            const hasKeys = (node.tracks?.[p.key]?.length ?? 0) > 0
 
-        return (
-          <div key={p.key} className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                {p.type === 'file' ? (
-                  <FileField
-                    label={p.label}
-                    value={String(value ?? '')}
-                    filename={String(node.params.filename ?? '')}
-                    onChange={(dataUrl, filename) => {
-                      setParam(node.id, p.key, dataUrl)
-                      setParam(node.id, 'filename', filename)
-                    }}
-                  />
-                ) : (
-                  <ParamField
-                    def={p}
-                    value={value}
-                    disabled={node.enabled === false}
-                    onChange={(v) => setParam(node.id, p.key, v)}
-                  />
+            return (
+              <div key={p.key} className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    {p.type === 'file' ? (
+                      <FileField
+                        label={p.label}
+                        value={String(value ?? '')}
+                        filename={String(node.params.filename ?? '')}
+                        onChange={(dataUrl, filename) => {
+                          setParam(node.id, p.key, dataUrl)
+                          setParam(node.id, 'filename', filename)
+                        }}
+                      />
+                    ) : (
+                      <ParamField
+                        def={p}
+                        value={value}
+                        disabled={node.enabled === false}
+                        onChange={(v) => setParam(node.id, p.key, v)}
+                      />
+                    )}
+                  </div>
+
+                  {p.animatable && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        title="Sett keyframe på nåværende frame"
+                        onClick={() => setKeyframe(node.id, p.key, frame, value)}
+                        className={`h-6 w-6 rounded border text-[10px] ${
+                          hasKeys
+                            ? 'border-amber-400 bg-amber-400/20 text-amber-300'
+                            : 'border-zinc-700 text-zinc-500 hover:border-amber-400/60'
+                        }`}
+                      >
+                        ◆
+                      </button>
+                      <button
+                        type="button"
+                        title="Automatisk animasjon (LFO)"
+                        onClick={() => setLfo(node.id, p.key, { on: !lfo?.on })}
+                        className={`h-6 w-6 rounded border text-[10px] ${
+                          lfo?.on
+                            ? 'border-lime-400 bg-lime-400/20 text-lime-300'
+                            : 'border-zinc-700 text-zinc-500 hover:border-lime-400/60'
+                        }`}
+                      >
+                        ∿
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {lfo?.on && (
+                  <div className="ml-1 flex flex-col gap-1.5 rounded-lg border border-lime-500/20 bg-lime-500/5 p-2">
+                    <label className="flex items-center gap-2">
+                      <span className="w-24 text-[10px] uppercase tracking-wide text-zinc-500">Form</span>
+                      <select
+                        value={lfo.shape}
+                        onChange={(e) =>
+                          setLfo(node.id, p.key, { shape: e.target.value as typeof lfo.shape })
+                        }
+                        className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-[11px] text-zinc-100"
+                      >
+                        {WAVEFORMS.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <span className="w-24 text-[10px] uppercase tracking-wide text-zinc-500">Styrke</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={lfo.amount}
+                        onChange={(e) => setLfo(node.id, p.key, { amount: Number(e.target.value) })}
+                        className="h-1 flex-1 accent-lime-400"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <span className="w-24 text-[10px] uppercase tracking-wide text-zinc-500">Sykluser</span>
+                      <input
+                        type="range"
+                        min={1}
+                        max={8}
+                        step={1}
+                        value={lfo.cycles}
+                        onChange={(e) => setLfo(node.id, p.key, { cycles: Number(e.target.value) })}
+                        className="h-1 flex-1 accent-lime-400"
+                      />
+                    </label>
+                  </div>
                 )}
               </div>
+            )
+          })}
 
-              {p.animatable && (
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    title="Sett keyframe på nåværende frame"
-                    onClick={() => setKeyframe(node.id, p.key, frame, value)}
-                    className={`h-6 w-6 rounded border text-[10px] ${
-                      hasKeys
-                        ? 'border-amber-400 bg-amber-400/20 text-amber-300'
-                        : 'border-zinc-700 text-zinc-500 hover:border-amber-400/60'
-                    }`}
-                  >
-                    ◆
-                  </button>
-                  <button
-                    type="button"
-                    title="Automatisk animasjon (LFO)"
-                    onClick={() => setLfo(node.id, p.key, { on: !lfo?.on })}
-                    className={`h-6 w-6 rounded border text-[10px] ${
-                      lfo?.on
-                        ? 'border-lime-400 bg-lime-400/20 text-lime-300'
-                        : 'border-zinc-700 text-zinc-500 hover:border-lime-400/60'
-                    }`}
-                  >
-                    ∿
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {lfo?.on && (
-              <div className="ml-1 flex flex-col gap-1.5 rounded-lg border border-lime-500/20 bg-lime-500/5 p-2">
-                <label className="flex items-center gap-2">
-                  <span className="w-24 text-[10px] uppercase tracking-wide text-zinc-500">Form</span>
-                  <select
-                    value={lfo.shape}
-                    onChange={(e) =>
-                      setLfo(node.id, p.key, { shape: e.target.value as typeof lfo.shape })
-                    }
-                    className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-[11px] text-zinc-100"
-                  >
-                    {WAVEFORMS.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex items-center gap-2">
-                  <span className="w-24 text-[10px] uppercase tracking-wide text-zinc-500">Styrke</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={lfo.amount}
-                    onChange={(e) => setLfo(node.id, p.key, { amount: Number(e.target.value) })}
-                    className="h-1 flex-1 accent-lime-400"
-                  />
-                </label>
-                <label className="flex items-center gap-2">
-                  <span className="w-24 text-[10px] uppercase tracking-wide text-zinc-500">Sykluser</span>
-                  <input
-                    type="range"
-                    min={1}
-                    max={8}
-                    step={1}
-                    value={lfo.cycles}
-                    onChange={(e) => setLfo(node.id, p.key, { cycles: Number(e.target.value) })}
-                    className="h-1 flex-1 accent-lime-400"
-                  />
-                </label>
-              </div>
-            )}
-          </div>
-        )
-      })}
-
-      <button
-        type="button"
-        onClick={() => resetParams(node.id)}
-        className="self-start rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
-      >
-        Tilbakestill parametere
-      </button>
+          <button
+            type="button"
+            onClick={() => resetParams(node.id)}
+            className="self-start rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+          >
+            Tilbakestill parametere
+          </button>
+        </CollapsibleSection>
+      ) : (
+        <p className="text-[11px] text-zinc-500">Denne noden har ingen parametere.</p>
+      )}
     </div>
   )
 }
