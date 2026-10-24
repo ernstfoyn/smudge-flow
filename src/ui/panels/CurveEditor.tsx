@@ -10,6 +10,7 @@ import {
   type CurveShape,
 } from '../../engine/animation/curves'
 import type { GraphNode } from '../../engine/types'
+import { HelpLink } from '../primitives/HelpLink'
 
 const W = 240
 const H = 110
@@ -160,7 +161,10 @@ export function CurveEditor({ node }: { node: GraphNode }) {
       <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-500">
         <span>Én syklus · −1 til 1</span>
         {editable ? (
-          <span>Klikk: nytt punkt · dobbeltklikk: fjern</span>
+          <span className="flex items-center gap-2">
+            Klikk: nytt punkt · dobbeltklikk: fjern
+            <HelpLink topic="signaler-og-styring" />
+          </span>
         ) : (
           <button
             type="button"

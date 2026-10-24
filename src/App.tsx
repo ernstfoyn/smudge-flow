@@ -10,6 +10,8 @@ import { ResizeHandle } from './ui/primitives/ResizeHandle'
 import { useElementSize, usePanelLayout } from './ui/usePanelLayout'
 import { useGraphStore } from './state/useGraphStore'
 import { useThemeStore } from './state/useThemeStore'
+import { useHelpStore, hasSeenHelp } from './state/useHelpStore'
+import { HelpDialog } from './ui/HelpDialog'
 import { usePlaybackStore } from './state/usePlaybackStore'
 import { serializeGraph, deserializeGraph } from './engine/graph'
 
@@ -35,6 +37,26 @@ export default function App() {
 
   const [workspaceRef, workspace] = useElementSize<HTMLDivElement>()
   const { layout, limits, setPanel, resetPanel } = usePanelLayout(workspace)
+
+  // Første gang appen åpnes, vises hjelpen. Senere åpnes den med ? eller knappen.
+  useEffect(() => {
+    if (!hasSeenHelp()) useHelpStore.getState().show('kom-i-gang')
+  }, [])
+
+  // «?» åpner og lukker hjelpen, men ikke når brukeren skriver i et felt.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '?' || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
+        return
+      }
+      event.preventDefault()
+      useHelpStore.getState().toggle()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   // Cmd/Ctrl+Z angrer, Cmd/Ctrl+Shift+Z gjør om.
   useEffect(() => {
@@ -141,9 +163,11 @@ export default function App() {
           >
             Nullstill
           </button>
+          <HelpButton />
           <ThemeToggle />
         </div>
       </header>
+      <HelpDialog />
 
       {notice && (
         <div className="flex items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[12px] text-amber-200">
@@ -282,6 +306,21 @@ export default function App() {
         </aside>
       </div>
     </div>
+  )
+}
+
+function HelpButton() {
+  const show = useHelpStore((s) => s.show)
+  return (
+    <button
+      type="button"
+      onClick={() => show()}
+      title="Hjelp (?)"
+      aria-label="Åpne hjelp"
+      className="rounded border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-[12px] font-semibold text-zinc-400 hover:bg-zinc-800"
+    >
+      ?
+    </button>
   )
 }
 

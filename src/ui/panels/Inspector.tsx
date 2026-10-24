@@ -9,6 +9,7 @@ import {
   isParamVisible,
 } from '../../engine/drive'
 import { CurveEditor } from './CurveEditor'
+import { HelpLink } from '../primitives/HelpLink'
 import { useGraphStore } from '../../state/useGraphStore'
 import { usePlaybackStore } from '../../state/usePlaybackStore'
 import { ParamField } from '../primitives/Fields'
@@ -170,6 +171,9 @@ function DriveLinks({ node }: { node: GraphNode }) {
         Signalet svinger parameteren rundt verdien du har satt, over en andel av parameterens eget
         område. Negativ styrke snur bevegelsen. Flere signaler legges sammen.
       </p>
+      <div className="mt-1">
+        <HelpLink topic="signaler-og-styring" />
+      </div>
     </CollapsibleSection>
   )
 }

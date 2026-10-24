@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useGraphStore } from '../../state/useGraphStore'
 import { evaluator, renderServices } from '../../state/studio'
 import { exportGraph } from '../../export/exportGraph'
+import { HelpLink } from '../primitives/HelpLink'
 import {
   ASPECT_PRESETS,
   OUTPUT_FORMATS,
@@ -155,7 +156,10 @@ export function ExportPanel() {
   return (
     <div className="flex h-full min-w-0 flex-col gap-3 overflow-y-auto p-3">
       <section className="flex min-w-0 flex-col gap-2">
-        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Format</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Format</h3>
+          <HelpLink topic="eksport" />
+        </div>
 
         <label className="flex min-w-0 items-center gap-2">
           <span className="w-20 shrink-0 text-[11px] text-zinc-400">Filformat</span>

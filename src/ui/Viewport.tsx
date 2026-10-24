@@ -3,6 +3,7 @@ import { useGraphStore } from '../state/useGraphStore'
 import { usePlaybackStore } from '../state/usePlaybackStore'
 import { evaluator, lastOutputs, renderServices } from '../state/studio'
 import { registry } from '../nodes'
+import { HelpLink } from './primitives/HelpLink'
 
 /**
  * Forhåndsvisningen.
@@ -138,8 +139,9 @@ export function Viewport() {
             Graffen kan ikke evalueres
           </strong>
           {error}
-          <p className="mt-1.5 text-[11px] text-red-300/70">
-            Nodekort med en rødd prikk mangler en påkrevd inngang.
+          <p className="mt-1.5 flex items-center gap-2 text-[11px] text-red-300/70">
+            Nodekort med en rød prikk mangler en påkrevd inngang.
+            <HelpLink topic="feilsoking" />
           </p>
         </div>
       )}
