@@ -46,7 +46,7 @@ export function NodeTabMenu({ anchor, host, onPick, onClose }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const results = useMemo(() => searchNodes(registry.all(), query), [query])
+  const results = useMemo(() => searchNodes(registry.listed(), query), [query])
   const current = results[active]
 
   useEffect(() => {

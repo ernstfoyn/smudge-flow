@@ -71,6 +71,7 @@ export const loopSource: NodeDefinition<LoopParams> = {
   type: 'source.loop',
   label: 'Loop-generator',
   category: 'curve',
+  hidden: true,
   description:
     'Alt-i-ett kurve med vindu: sinus, trekant, sag, firkant og støy. Koble «Verdi» til en parameter for å automatisere den.',
   inputs: [],

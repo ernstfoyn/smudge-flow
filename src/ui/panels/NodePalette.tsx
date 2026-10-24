@@ -42,7 +42,7 @@ export function NodePalette() {
   )
 
   const q = query.trim()
-  const searchResults = q ? searchNodes(registry.all(), q) : []
+  const searchResults = q ? searchNodes(registry.listed(), q) : []
 
   return (
     <div className="flex flex-col gap-3 p-3">

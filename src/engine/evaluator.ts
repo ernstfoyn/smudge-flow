@@ -12,7 +12,7 @@ import type {
 import { topoSortScope } from './topoSort'
 import { GraphError } from './errors'
 import { resolveParamsAt } from './params'
-import { isDrivableParam } from './drive'
+import { driveSettings, drivenKeys, modulate } from './drive'
 import type { NodeRegistry } from './registry'
 import type { RenderServices } from './types'
 
@@ -162,15 +162,21 @@ export class Evaluator {
       const def = this.registry.get(node.type)
       const params = resolveParamsAt(node, frame, phase, def)
 
-      // Styring av hele noden: verdien gjelder alle valgte parametere.
-      // Enkeltkoblinger under overstyrer, siden de er mer spesifikke.
+      // Signaler: modulerer parametere rundt grunnverdien. Flere signaler
+      // legges sammen, og resultatet begrenses til parameterens område.
+      const deltas = new Map<string, number>()
       for (const edge of driveEdges.get(id) ?? []) {
-        const value = outputs.get(edge.source)?.[edge.sourcePort]
-        if (typeof value !== 'number') continue
-        for (const key of node.drives ?? []) {
-          const param = def.params.find((p) => p.key === key)
-          if (param && isDrivableParam(param)) params[key] = clampToParam(value, param)
+        const signal = outputs.get(edge.source)?.[edge.sourcePort]
+        if (typeof signal !== 'number' || !Number.isFinite(signal)) continue
+        const { amount } = driveSettings(edge)
+        for (const key of drivenKeys(edge, def.params)) {
+          deltas.set(key, (deltas.get(key) ?? 0) + signal * amount)
         }
+      }
+      for (const [key, delta] of deltas) {
+        const param = def.params.find((p) => p.key === key)
+        const base = Number(params[key])
+        if (Number.isFinite(base)) params[key] = modulate(base, delta, param)
       }
 
       // Parameter-koblinger: verdien fra kilden overstyrer parameteren.

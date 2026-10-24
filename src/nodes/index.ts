@@ -10,6 +10,7 @@ import { objSource } from './source/objSource'
 import { noise } from './source/noise'
 import { voronoi } from './source/voronoi'
 import { curveNodes } from './curve/curves'
+import { signalNode } from './curve/signal'
 import { transform2D } from './modifier/transform2D'
 import { motion2D } from './modifier/motion2D'
 import { smudgeDeform } from './modifier/smudgeDeform'
@@ -49,7 +50,8 @@ export const registry = new NodeRegistry().registerAll([
   objSource,
   noise,
   voronoi,
-  // Kurver — frittstående verdier som styrer parametere
+  // Signaler — kurver som styrer parametere
+  signalNode,
   ...curveNodes,
   loopSource,
   // Modifikatorer

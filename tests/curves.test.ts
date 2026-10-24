@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { Evaluator } from '../src/engine/evaluator'
 import { NodeRegistry } from '../src/engine/registry'
 import { createEdge } from '../src/engine/graph'
-import { curveValue, type CurveShape } from '../src/engine/animation/curves'
+import { curveValue, drawnCurve, type CurveShape } from '../src/engine/animation/curves'
 import { curveNodes } from '../src/nodes/curve/curves'
+import { signalNode } from '../src/nodes/curve/signal'
 import { registry } from '../src/nodes'
 import type { EvalContext, Graph, NodeDefinition } from '../src/engine/types'
 import { fakeRender } from './fakeRender'
@@ -182,5 +183,103 @@ describe('kurvenoder styrer andre noders parametere', () => {
     const out = await evaluator.evaluateFrame(g, 15, ['t'])
     expect(out.get('t')?.a).toBeCloseTo(10, 6)
     expect(out.get('t')?.b).toBe(0)
+  })
+})
+
+describe('signal-noden', () => {
+  const evalSignal = (phase: number, params: Record<string, unknown> = {}) =>
+    (signalNode.evaluate(
+      context(phase),
+      {},
+      { ...defaultsFor(signalNode), ...params },
+    ) as { signal: number }).signal
+
+  it('er den eneste synlige kurvenoden, med ett Signal-uttak', () => {
+    const listed = registry.listed().filter((d) => d.category === 'curve')
+    expect(listed.map((d) => d.type)).toEqual(['curve.signal'])
+    expect(signalNode.outputs).toEqual([{ id: 'signal', label: 'Signal', type: 'number' }])
+    expect(registry.has('curve.sine')).toBe(true) // eldre grafer virker fortsatt
+    expect(registry.has('source.loop')).toBe(true)
+  })
+
+  it('gir −1…1 for alle former og lukker loopen', () => {
+    for (const shape of [...SHAPES, 'draw']) {
+      for (const speed of [1, 4]) {
+        for (let i = 0; i <= 100; i++) {
+          const v = evalSignal(i / 100, { shape, speed })
+          expect(v).toBeGreaterThanOrEqual(-1 - 1e-9)
+          expect(v).toBeLessThanOrEqual(1 + 1e-9)
+        }
+        expect(evalSignal(1, { shape, speed, phase: 0.3 })).toBeCloseTo(
+          evalSignal(0, { shape, speed, phase: 0.3 }),
+          6,
+        )
+      }
+    }
+  })
+
+  it('hastighet er antall sykluser per loop', () => {
+    expect(evalSignal(0.125, { shape: 'sine', speed: 2 })).toBeCloseTo(1, 9)
+    expect(evalSignal(0.25, { shape: 'sine', speed: 2 })).toBeCloseTo(0, 9)
+  })
+
+  it('fase forskyver kurven', () => {
+    expect(evalSignal(0, { shape: 'sine', phase: 0.25 })).toBeCloseTo(1, 9)
+  })
+})
+
+describe('tegnet kurve', () => {
+  it('treffer kontrollpunktene eksakt', () => {
+    const points = [
+      { x: 0, y: -1 },
+      { x: 0.5, y: 1 },
+    ]
+    expect(drawnCurve(points, 0)).toBeCloseTo(-1, 9)
+    expect(drawnCurve(points, 0.5)).toBeCloseTo(1, 9)
+    expect(drawnCurve(points, 0.5, false)).toBeCloseTo(1, 9)
+  })
+
+  it('interpolerer lineært mellom punktene når det er valgt', () => {
+    const points = [
+      { x: 0, y: 0 },
+      { x: 0.5, y: 1 },
+    ]
+    expect(drawnCurve(points, 0.25, false)).toBeCloseTo(0.5, 9)
+  })
+
+  it('er sluttet: kurven fortsetter fra siste punkt tilbake til første', () => {
+    const points = [
+      { x: 0.2, y: 1 },
+      { x: 0.8, y: -1 },
+    ]
+    expect(drawnCurve(points, 0, false)).toBeCloseTo(0, 9) // midt mellom −1 (x=−0,2) og 1 (x=0,2)
+    expect(drawnCurve(points, 1, false)).toBeCloseTo(drawnCurve(points, 0, false), 9)
+    expect(drawnCurve(points, 0.97, true)).toBeCloseTo(drawnCurve(points, -0.03, true), 9)
+  })
+
+  it('holder seg i −1…1 også med glatt interpolasjon', () => {
+    const points = [
+      { x: 0, y: 1 },
+      { x: 0.1, y: -1 },
+      { x: 0.2, y: 1 },
+      { x: 0.3, y: -1 },
+    ]
+    for (let i = 0; i <= 200; i++) {
+      const v = drawnCurve(points, i / 200)
+      expect(v).toBeGreaterThanOrEqual(-1)
+      expect(v).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('tåler ugyldige eller for få punkter', () => {
+    expect(Number.isFinite(drawnCurve(undefined, 0.3))).toBe(true)
+    expect(Number.isFinite(drawnCurve([{ x: 0.5, y: 0 }], 0.3))).toBe(true)
+    expect(Number.isFinite(drawnCurve([{ x: 'a', y: 0 }, { x: NaN, y: 1 }], 0.3))).toBe(true)
+  })
+
+  it('sorterer punkter som er lagret i feil rekkefølge', () => {
+    const a = drawnCurve([{ x: 0.8, y: -1 }, { x: 0.2, y: 1 }], 0.4)
+    const b = drawnCurve([{ x: 0.2, y: 1 }, { x: 0.8, y: -1 }], 0.4)
+    expect(a).toBeCloseTo(b, 9)
   })
 })

@@ -190,31 +190,37 @@ Blokker lagres i `localStorage` og kan eksporteres/importeres som JSON.
 
 ## 4. Automatisert looping
 
-### Kurvenoder (`curve.*`)
+### Signal (`curve.signal`)
 
-Egne, frittstående noder i kategorien **Kurver**. Hver node lager én løkkesikker
-verdi og styrer hvilken som helst tallparameter via diamanten på målnoden.
+Én node i kategorien **Signaler**: bare en kurve. Den har tre grunninnstillinger
+og ett uttak:
 
-| Node | Form |
+| Innstilling | Virkning |
 |---|---|
-| `curve.sine` | Sinus |
-| `curve.triangle` | Trekant |
-| `curve.saw` | Sagtann |
-| `curve.square` | Firkant, med `width` (pulsbredde) |
-| `curve.noise` | Løkkesikker støy (`detail`, `seed`) |
-| `curve.ease` | Myk opp-og-ned (smoothstep) |
-| `curve.bounce` | Sprett (skarpe bunner) |
-| `curve.spring` | Dempet svingning (`ripples`, `damping`) |
-| `curve.steps` | Trapp (`detail` = antall trinn) |
-| `curve.hold` | Tilfeldig trinn / sample & hold |
+| `shape` (Form) | sinus, trekant, sagtann, firkant/puls, støy, myk puls, sprett, fjær, trapp, tilfeldig trinn eller **tegnet kurve** |
+| `speed` (Hastighet) | heltall sykluser per loop |
+| `phase` (Fase) | forskyver kurven (0..1) |
 
-Felles parametere: `cycles` (heltall per loop), `phase` (0..1), `min`, `max`.
-Utgangene er `value` (min..max) og `inverse` (`min + max − value`), så én kurve
-kan styre to parametere i motfase.
+Noen former har egne innstillinger (pulsbredde, svingninger/demping,
+detalj/trinn, frø). De vises bare når formen trenger dem (`ParamDef.showWhen`).
 
-Formene ligger i `src/engine/animation/curves.ts`. Alle er periodiske med
-periode 1, og `cycles` er et heltall, så verdien ved frame 0 er lik verdien ved
-frame N. Dekket av `tests/curves.test.ts`.
+Uttaket `signal` er alltid **−1…1**. Det finnes ingen min/max på signalet: hvor
+mye det styrer bestemmes på koblingen (se «Styring» under).
+
+Alle formene ligger i `src/engine/animation/curves.ts` og er periodiske med
+periode 1. Fordi hastigheten er et heltall, er verdien ved frame 0 lik verdien
+ved frame N, og eksporten loopes uten hopp.
+
+**Tegnet kurve.** Punktene (`points`, x 0..1, y −1..1) danner en sluttet løkke:
+kurven går fra siste punkt tilbake til det første. «Glatt» bruker kubisk
+interpolasjon med felles tangenter over skjøten; «Rette linjer» er lineær. I
+Egenskaper klikker du i feltet for å legge til et punkt, drar for å flytte, og
+dobbeltklikker for å fjerne. **Tegn selv** gjør dagens form om til punkter.
+Forhåndsvisningen viser én syklus med en markør som følger avspillingen.
+
+De eldre nodene `curve.sine`, `curve.triangle` … og `source.loop` virker
+fortsatt i eksisterende grafer og i blokkene, men er skjult i paletten
+(`NodeDefinition.hidden`).
 
 ### Loop-generatoren (`source.loop`)
 
@@ -254,21 +260,38 @@ spiral/sverm og faseforskyvningen per kopi, som i den gamle cloneren.
 Standardblokkene «Bevegelig bilde» og «3D-animasjon» er ferdige kjeder som viser
 begge nodene med et fornuftig utgangspunkt.
 
-### Styring: én kobling til hele noden
+### Styring: signaler som beveger parametere
 
-Hver node med tallparametere har en **Styring**-inngang på venstre side av
-kortet. Dra «Verdi» fra en kurve dit, så åpner Egenskaper en liste der du
-huker av hvilke parametere kurven skal styre (**Alle** / **Ingen** finnes også).
+Hver node med tallparametere har en **Styring**-inngang på venstre side. Dra
+«Signal» dit. Samme signal kan kobles til så mange noder du vil, og en node kan
+styres av flere signaler.
 
-- Kanten har `kind: 'drive'` og peker på porten `drive:all`.
-- Valget lagres på målnoden i `node.drives` (liste med parameternøkler).
-- Verdien settes rett inn i hver valgt parameter og begrenses til
-  parameterens `min`/`max` (heltall rundes). Sett Min og Max på kurven slik at
-  området passer.
-- En enkeltkobling til en diamant overstyrer styringen for den ene parameteren.
-- Én styring per node: en ny kobling erstatter den gamle.
+Hver kobling (`kind: 'drive'`) har egne innstillinger, som vises under
+**Styring** når du markerer *målnoden*:
 
-Diamantene (én parameter) ligger på venstre side, sammen med alle andre
+- **Styrer:** alle styrbare parametere, eller én bestemt.
+- **Styrke:** −100…100 %. Negativ styrke snur bevegelsen.
+
+Signalet *moduleres rundt grunnverdien*, slik LFO-en i den opprinnelige appen:
+
+```
+effektiv = grunnverdi + signal × styrke × (max − min) / 2
+```
+
+Styrken er relativ til hver parameters eget område. Derfor kan ett signal
+styre en node med område 0–1 og en annen med 3–80 med samme resultat. Flere
+signaler legges sammen før resultatet begrenses til `min`/`max` (heltall
+rundes). Parametere uten grenser bruker `2 × |verdi|` som spennvidde.
+
+- Et signal dratt rett til en **diamant** blir en kobling som bare styrer den
+  parameteren.
+- En vanlig tallkilde til en diamant (`kind: 'param'`) setter fortsatt verdien
+  rett inn, og overstyrer signalene for den parameteren.
+- Kortet viser «Alle · 50 %» (eller antall signaler) på Styring-raden.
+
+Logikken ligger i `src/engine/drive.ts` og er dekket av `tests/drive.test.ts`.
+
+Diamantene (én parameter) ligger på venstre side sammen med alle andre
 innganger. Utganger ligger alltid til høyre.
 
 ### Parameter-koblinger
@@ -279,7 +302,7 @@ fire første tallparametrene; **Vis alle** åpner resten. Parametere som er
 koblet vises alltid, slik at koblingen ikke mister håndtaket sitt.
 
 ```
-curve.sine ──value──▶ modifier.raster.param:cellSize
+source.loop ──value──▶ modifier.raster.param:cellSize
 ```
 
 Motoren løser parametrene i rekkefølgen:

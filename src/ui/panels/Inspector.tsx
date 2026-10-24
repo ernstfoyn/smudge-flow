@@ -2,7 +2,13 @@ import { useRef } from 'react'
 import { registry } from '../../nodes'
 import type { Graph, GraphNode } from '../../engine/types'
 import { nodeParamDefs, nodePorts } from '../../engine/graph'
-import { drivableParams } from '../../engine/drive'
+import {
+  SIGNAL_NODE_TYPE,
+  drivableParams,
+  driveSettings,
+  isParamVisible,
+} from '../../engine/drive'
+import { CurveEditor } from './CurveEditor'
 import { useGraphStore } from '../../state/useGraphStore'
 import { usePlaybackStore } from '../../state/usePlaybackStore'
 import { ParamField } from '../primitives/Fields'
@@ -68,90 +74,92 @@ function nodeTitle(graph: Graph, id: string): string {
 
 /** Etikett på en parameter. */
 /**
- * Avkrysningsliste over parameterne en «Styring»-kobling skal styre.
- * Vises både på målnoden og på kilden (kurven), slik at du kan velge fra
- * den noden du har markert.
+ * «Styring»: signalene som beveger denne nodens parametere. Hver kobling har
+ * sin egen styrke og kan styre alle parametere eller bare én.
  */
-function DrivePicker({
-  id,
-  title,
-  targetId,
-  sourceId,
-  perspective,
-}: {
-  id: string
-  title: string
-  targetId: string
-  sourceId: string
-  perspective: 'source' | 'target'
-}) {
+function DriveLinks({ node }: { node: GraphNode }) {
   const graph = useGraphStore((s) => s.graph)
-  const setDrives = useGraphStore((s) => s.setDrives)
+  const setDrive = useGraphStore((s) => s.setDrive)
+  const disconnect = useGraphStore((s) => s.disconnect)
 
-  const target = graph.nodes.find((n) => n.id === targetId)
-  if (!target || target.type === 'group' || !registry.has(target.type)) return null
+  const edges = graph.edges.filter((e) => e.kind === 'drive' && e.target === node.id)
+  if (!edges.length || node.type === 'group' || !registry.has(node.type)) return null
 
-  const candidates = drivableParams(registry.get(target.type).params)
-  const driven = (target.drives ?? []).filter((key) => candidates.some((p) => p.key === key))
-  const sourceTitle = nodeTitle(graph, sourceId)
-  const targetTitle = nodeTitle(graph, targetId)
+  const candidates = drivableParams(registry.get(node.type).params).filter((p) =>
+    isParamVisible(p, node.params),
+  )
 
   return (
     <CollapsibleSection
-      id={id}
-      title={title}
-      badge={driven.length}
+      id="inspector.drive"
+      title="Styring"
+      badge={edges.length}
       className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2"
     >
-      <p className="mb-1.5 text-[11px] leading-relaxed text-zinc-400">
-        {perspective === 'source' ? (
-          <>
-            Huk av parameterne på <span className="text-zinc-200">{targetTitle}</span> som skal
-            følge denne kurven.
-          </>
-        ) : (
-          <>
-            Styres av <span className="text-zinc-200">{sourceTitle}</span>. Huk av parameterne som
-            skal følge verdien.
-          </>
-        )}
-      </p>
-
-      <div className="mb-1.5 flex gap-1.5">
-        <button
-          type="button"
-          onClick={() => setDrives(targetId, candidates.map((p) => p.key))}
-          className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
-        >
-          Alle
-        </button>
-        <button
-          type="button"
-          onClick={() => setDrives(targetId, [])}
-          className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
-        >
-          Ingen
-        </button>
-      </div>
-
-      <ul className="flex flex-col gap-0.5">
-        {candidates.map((p) => {
-          const checked = driven.includes(p.key)
+      <ul className="flex flex-col gap-2">
+        {edges.map((edge) => {
+          const settings = driveSettings(edge)
+          const fixed = edge.targetPort.startsWith('param:')
           return (
-            <li key={p.key}>
-              <label className="flex min-w-0 cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800/60">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() =>
-                    setDrives(
-                      targetId,
-                      checked ? driven.filter((key) => key !== p.key) : [...driven, p.key],
-                    )
-                  }
-                  className="h-3.5 w-3.5 shrink-0 accent-sky-400"
+            <li
+              key={edge.id}
+              className="flex min-w-0 flex-col gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 p-2"
+            >
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: PARAM_META.color }}
                 />
-                <span className="min-w-0 truncate">{p.label}</span>
+                <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-200">
+                  {nodeTitle(graph, edge.source)}
+                </span>
+                <button
+                  type="button"
+                  title="Koble fra"
+                  onClick={() => disconnect(edge.id)}
+                  className="shrink-0 rounded px-1 text-[10px] text-red-400 hover:bg-red-950/40"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <label className="flex min-w-0 items-center gap-2 text-[11px] text-zinc-400">
+                <span className="w-12 shrink-0">Styrer</span>
+                {fixed ? (
+                  <span className="min-w-0 flex-1 truncate text-zinc-200">
+                    {paramLabel(node, settings.param ?? undefined)}
+                  </span>
+                ) : (
+                  <select
+                    value={settings.param ?? ''}
+                    onChange={(e) => setDrive(edge.id, { param: e.target.value || null })}
+                    className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-[11px] text-zinc-100"
+                  >
+                    <option value="">Alle parametere</option>
+                    {candidates.map((p) => (
+                      <option key={p.key} value={p.key}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </label>
+
+              <label className="flex min-w-0 items-center gap-2 text-[11px] text-zinc-400">
+                <span className="w-12 shrink-0">Styrke</span>
+                <input
+                  type="range"
+                  min={-1}
+                  max={1}
+                  step={0.01}
+                  value={settings.amount}
+                  onChange={(e) => setDrive(edge.id, { amount: Number(e.target.value) })}
+                  className="h-1 min-w-0 flex-1 accent-sky-400"
+                />
+                <span className="w-10 shrink-0 text-right tabular-nums text-zinc-300">
+                  {Math.round(settings.amount * 100)} %
+                </span>
               </label>
             </li>
           )
@@ -159,9 +167,8 @@ function DrivePicker({
       </ul>
 
       <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
-        Verdien settes rett inn i hver valgt parameter og begrenses til parameterens eget område.
-        Justér Min og Max på kurven for å treffe riktig område. En enkeltkobling (diamant)
-        overstyrer styringen for den ene parameteren.
+        Signalet svinger parameteren rundt verdien du har satt, over en andel av parameterens eget
+        område. Negativ styrke snur bevegelsen. Flere signaler legges sammen.
       </p>
     </CollapsibleSection>
   )
@@ -206,7 +213,9 @@ export function Inspector() {
   const isGroup = node.type === 'group'
   const def = isGroup ? null : registry.get(node.type)
   const params = def?.params ?? []
-  const editableParams = params.filter((p) => p.type !== 'layers')
+  const editableParams = params.filter(
+    (p) => p.type !== 'layers' && p.type !== 'curve' && isParamVisible(p, node.params),
+  )
 
   /** Lagene som er koblet til en multiple-port, i tegnerrekkefølge. */
   const nodePortDefs = nodePorts(node)
@@ -216,13 +225,6 @@ export function Inspector() {
   /** Alle koblinger inn og ut av noden. */
   const incoming = graph.edges.filter((e) => e.target === node.id)
   const outgoing = graph.edges.filter((e) => e.source === node.id)
-
-  /** «Styring»: én kobling som styrer flere parametere på denne noden. */
-  const driveEdge = incoming.find((e) => e.kind === 'drive')
-  const driveCandidates = isGroup ? [] : drivableParams(params)
-  const drivenKeys = (node.drives ?? []).filter((key) =>
-    driveCandidates.some((p) => p.key === key),
-  )
 
   if (isGroup) {
     return (
@@ -512,18 +514,7 @@ export function Inspector() {
         </p>
       )}
 
-      {outgoing
-        .filter((edge) => edge.kind === 'drive')
-        .map((edge) => (
-          <DrivePicker
-            key={edge.id}
-            id={`inspector.drive.out.${edge.target}`}
-            title={`Styrer «${nodeTitle(graph, edge.target)}»`}
-            targetId={edge.target}
-            sourceId={node.id}
-            perspective="source"
-          />
-        ))}
+      {node.type === SIGNAL_NODE_TYPE && <CurveEditor node={node} />}
 
       {layerPorts.map((port) => {
         const edges = graph.edges.filter((e) => e.target === node.id && e.targetPort === port.id)
@@ -669,15 +660,7 @@ export function Inspector() {
         )
       })}
 
-      {driveEdge && (
-        <DrivePicker
-          id="inspector.drive"
-          title="Styring"
-          targetId={node.id}
-          sourceId={driveEdge.source}
-          perspective="target"
-        />
-      )}
+      <DriveLinks node={node} />
 
       {node.type === 'modifier.trail' && <TrailPad nodeId={node.id} />}
 
@@ -721,7 +704,10 @@ export function Inspector() {
                     )}
                     {edge.kind === 'drive' && (
                       <span className="ml-1 text-[10px]" style={{ color: PARAM_META.color }}>
-                        → Styring ({drivenKeys.length} parametere)
+                        → {driveSettings(edge).param === null
+                          ? 'Alle parametere'
+                          : paramLabel(node, driveSettings(edge).param ?? undefined)}{' '}
+                        · {Math.round(driveSettings(edge).amount * 100)} %
                       </span>
                     )}
                   </span>

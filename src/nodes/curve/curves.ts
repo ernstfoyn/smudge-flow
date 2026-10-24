@@ -113,6 +113,7 @@ function makeCurve(spec: CurveSpec): NodeDefinition {
     type: `curve.${spec.shape}`,
     label: spec.label,
     category: 'curve',
+    hidden: true,
     description: `${spec.description} Koble «Verdi» til en diamant for å styre en parameter.`,
     inputs: [],
     outputs: [

@@ -68,6 +68,8 @@ export type ParamType =
   | 'stamps'
   /** En fil — leses inn som data-URL. */
   | 'file'
+  /** Punkter på en tegnet kurve: Array<{ x: 0..1, y: -1..1 }>. */
+  | 'curve'
   /**
    * Per-lag-innstillinger for en multiple-port, nøklet på kant-id.
    * Brukes av lagstabelen: hvert lag får sin egen modus og dekkevne.
@@ -89,6 +91,8 @@ export interface ParamDef {
   /** Kan styres fra en annen node (parameter-kobling). */
   drivable?: boolean
   group?: string
+  /** Vises bare når en annen parameter har en av disse verdiene. */
+  showWhen?: { key: string; in: Array<string | number> }
 }
 
 export interface Keyframe {
@@ -160,8 +164,6 @@ export interface GraphNode {
   group?: Subgraph
   /** Nodekortet vises sammenklappet. */
   collapsed?: boolean
-  /** Parameternøkler som styres av «Styring»-inngangen (kind: 'drive'). */
-  drives?: string[]
 }
 
 export interface GraphEdge {
@@ -174,11 +176,20 @@ export interface GraphEdge {
    * 'value' = vanlig dataflyt.
    * 'param'  = verdien fra kilden driver en parameter i målnoden
    *            (targetParam peker på parameterens nøkkel).
-   * 'drive'  = verdien fra kilden driver alle parameterne som er valgt i
-   *            målnodens `drives`-liste (én kobling til hele noden).
+   * 'drive'  = et signal (−1…1) som modulerer parametere rundt grunnverdien.
+   *            Innstillingene ligger i `drive`.
    */
   kind?: 'value' | 'param' | 'drive'
   targetParam?: string
+  drive?: DriveSettings
+}
+
+/** Innstillinger for en signalkobling (kind: 'drive'). */
+export interface DriveSettings {
+  /** Parameternøkkelen som styres, eller null for alle styrbare parametere. */
+  param: string | null
+  /** −1…1: andel av parameterens område signalet svinger over. */
+  amount: number
 }
 
 export interface GraphSettings {
@@ -303,6 +314,8 @@ export interface NodeDefinition<P = Record<string, unknown>> {
   category: 'source' | 'curve' | 'modifier' | 'composite' | 'output'
   /** Kort forklaring som vises i paletten og i noden. */
   description?: string
+  /** Skjules i paletten og søk, men virker i eksisterende grafer. */
+  hidden?: boolean
   inputs: readonly PortDef[]
   outputs: readonly PortDef[]
   params: readonly ParamDef[]

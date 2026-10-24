@@ -37,7 +37,12 @@ export class NodeRegistry {
     return [...this.definitions.values()]
   }
 
+  /** Nodene som vises i paletten og søk (uten skjulte, eldre typer). */
+  listed(): NodeDefinition[] {
+    return this.all().filter((d) => !d.hidden)
+  }
+
   byCategory(category: NodeDefinition['category']): NodeDefinition[] {
-    return this.all().filter((d) => d.category === category)
+    return this.listed().filter((d) => d.category === category)
   }
 }

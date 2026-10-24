@@ -4,7 +4,7 @@ import { registry } from '../../nodes'
 import { useGraphStore } from '../../state/useGraphStore'
 import { useConnectionDrag } from '../../state/useConnectionDrag'
 import { PARAM_PORT_PREFIX, nodeParamDefs, nodePorts } from '../../engine/graph'
-import { DRIVE_PORT_ID, drivableParams } from '../../engine/drive'
+import { DRIVE_PORT_ID, drivableParams, driveSettings, isParamVisible } from '../../engine/drive'
 import type { PortDef } from '../../engine/types'
 import { PARAM_META, paramPortCompatible, portMeta, valuePortsCompatible } from '../portStyle'
 
@@ -132,13 +132,13 @@ export function NodeCard({ id, selected }: NodeProps) {
     (port) => !port.optional && !edges.some((e) => e.target === id && e.targetPort === port.id),
   )
 
-  const drivable = drivableParams(paramDefs)
-  const driveEdge = edges.find((e) => e.kind === 'drive' && e.target === id)
-  const driveCount = (node.drives ?? []).filter((key) =>
-    drivable.some((p) => p.key === key),
-  ).length
+  const drivable = drivableParams(paramDefs).filter((p) => isParamVisible(p, node.params))
+  /** Signaler som styrer hele noden via «Styring» (ikke via en enkelt diamant). */
+  const signalEdges = edges.filter(
+    (e) => e.kind === 'drive' && e.target === id && e.targetPort === DRIVE_PORT_ID,
+  )
   const isDriven = (key: string) =>
-    edges.some((e) => e.kind === 'param' && e.target === id && e.targetParam === key)
+    edges.some((e) => e.target === id && e.targetPort === `${PARAM_PORT_PREFIX}${key}`)
   // Koblede parametere vises alltid, ellers mister kanten håndtaket sitt.
   const visibleParams = drivable.filter(
     (p, index) => showAllParams || index < MAX_VISIBLE_PARAMS || isDriven(p.key),
@@ -281,7 +281,7 @@ export function NodeCard({ id, selected }: NodeProps) {
             const state = driveState()
             return (
               <div
-                title="Styring — én kobling som styrer flere parametere. Velg hvilke i Egenskaper."
+                title="Styring — koble et signal hit. Velg styrke og parameter i Egenskaper."
                 className={`relative flex h-5 items-center gap-1.5 text-[10px] transition-opacity ${stateOpacity(state)}`}
               >
                 <PortDot
@@ -289,7 +289,7 @@ export function NodeCard({ id, selected }: NodeProps) {
                   side="left"
                   state={state}
                   color={PARAM_META.color}
-                  title="Styring — styr flere parametere med én kobling"
+                  title="Styring — la et signal bevege parameterne på denne noden"
                   label="Styring"
                 />
                 <span
@@ -298,16 +298,23 @@ export function NodeCard({ id, selected }: NodeProps) {
                   Styring
                 </span>
                 <span className="ml-auto shrink-0">
-                  {driveEdge ? (
-                    driveCount > 0 ? (
-                      <span className="rounded bg-sky-400/10 px-1 text-[9px] text-sky-300">
-                        {driveCount} {driveCount === 1 ? 'parameter' : 'parametere'}
-                      </span>
-                    ) : (
-                      <span className="rounded bg-amber-400/10 px-1 text-[9px] text-amber-300">
-                        velg i Egenskaper
-                      </span>
-                    )
+                  {signalEdges.length > 0 ? (
+                    <span
+                      className="rounded bg-sky-400/10 px-1 text-[9px] text-sky-300"
+                      title={signalEdges
+                        .map((e) => {
+                          const d = driveSettings(e)
+                          return `${d.param === null ? 'Alle' : d.param} · ${Math.round(d.amount * 100)} %`
+                        })
+                        .join('\n')}
+                    >
+                      {signalEdges.length === 1
+                        ? (() => {
+                            const d = driveSettings(signalEdges[0])
+                            return `${d.param === null ? 'Alle' : '1 param.'} · ${Math.round(d.amount * 100)} %`
+                          })()
+                        : `${signalEdges.length} signaler`}
+                    </span>
                   ) : (
                     <TypeChip
                       label="Tall"

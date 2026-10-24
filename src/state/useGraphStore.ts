@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Graph, GraphEdge, GraphNode, GraphSettings, Keyframe, LfoConfig, NodeId } from '../engine/types'
+import type { DriveSettings, Graph, GraphEdge, GraphNode, GraphSettings, Keyframe, LfoConfig, NodeId } from '../engine/types'
 import {
   PARAM_PORT_PREFIX,
   canConnectTypes,
@@ -12,7 +12,7 @@ import {
   rekeySubgraph,
 } from '../engine/graph'
 import { wouldCreateCycle } from '../engine/topoSort'
-import { DRIVE_PORT_ID, drivableParams } from '../engine/drive'
+import { DEFAULT_DRIVE, DRIVE_PORT_ID, SIGNAL_NODE_TYPE, drivableParams } from '../engine/drive'
 import { upsertKey } from '../engine/animation/keyframes'
 import { registry } from '../nodes'
 import { blockFromSelection } from '../blocks/builder'
@@ -87,8 +87,8 @@ interface GraphState {
   setLfo: (id: NodeId, path: string, patch: Partial<LfoConfig>) => void
 
   setSettings: (patch: Partial<GraphSettings>) => void
-  /** Velger hvilke parametere «Styring»-inngangen på noden styrer. */
-  setDrives: (id: NodeId, keys: string[]) => void
+  /** Endrer innstillingene (styrke, hvilken parameter) på en signalkobling. */
+  setDrive: (edgeId: string, patch: Partial<DriveSettings>) => void
   /** Tar ett steg tilbake i endringene. */
   undo: () => void
   /** Tar ett steg fram i endringene. */
@@ -175,6 +175,14 @@ function describeChange(
   if (nextNodes.size !== prevNodes.size) return { label: 'Endret grafen' }
   if (next.edges.length !== prev.edges.length) return { label: 'Endret koblinger' }
 
+  for (const edge of next.edges) {
+    if (edge.kind !== 'drive') continue
+    const before = prev.edges.find((e) => e.id === edge.id)
+    if (before && JSON.stringify(before.drive) !== JSON.stringify(edge.drive)) {
+      return { label: 'Endret styring', key: `drive:${edge.id}` }
+    }
+  }
+
   for (const [id, node] of nextNodes) {
     const before = prevNodes.get(id)
     if (!before) return { label: 'Endret grafen' }
@@ -184,9 +192,6 @@ function describeChange(
         (k) => JSON.stringify(before.params[k]) !== JSON.stringify(node.params[k]),
       )
       return { label: 'Endret parameter', key: `param:${id}:${key}` }
-    }
-    if (JSON.stringify(before.drives) !== JSON.stringify(node.drives)) {
-      return { label: 'Endret styring', key: `drives:${id}` }
     }
     if (JSON.stringify(before.tracks) !== JSON.stringify(node.tracks)) {
       return { label: 'Endret keyframes', key: `tracks:${id}` }
@@ -286,7 +291,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const outPort = findPort(sourcePorts.outputs, sourcePort)
     if (!outPort) return false
 
-    // --- Styring: én kobling til hele noden --------------------------------
+    // --- Styring: et signal som modulerer parametere -----------------------
     if (targetPort === DRIVE_PORT_ID) {
       if (outPort.type !== 'number') {
         set({ notice: 'Styring tar bare imot tall.' })
@@ -298,19 +303,20 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }
 
       const id = `${source}.${sourcePort}->${target}.${targetPort}`
+      if (graph.edges.some((e) => e.id === id)) {
+        set({ notice: 'Denne forbindelsen finnes allerede.' })
+        return false
+      }
+      // Flere signaler kan styre samme node: effektene legges sammen.
       set({
         graph: {
           ...graph,
-          // Én styring per node: en ny kobling erstatter den gamle.
           edges: [
-            ...graph.edges.filter((e) => !(e.kind === 'drive' && e.target === target)),
-            { id, source, sourcePort, target, targetPort, kind: 'drive' },
+            ...graph.edges,
+            { id, source, sourcePort, target, targetPort, kind: 'drive', drive: { ...DEFAULT_DRIVE } },
           ],
-          nodes: graph.nodes.map((n) =>
-            n.id === target && !n.drives ? { ...n, drives: [] } : n,
-          ),
         },
-        notice: `«${sourceNode.title}» styrer «${targetNode.title}». Marker kurven eller målnoden og velg parametere i Egenskaper.`,
+        notice: `«${sourceNode.title}» styrer «${targetNode.title}». Marker «${targetNode.title}» for å justere styrke og velge parameter.`,
       })
       return true
     }
@@ -328,6 +334,30 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }
 
       const id = `${source}.${sourcePort}->${target}.${targetPort}`
+
+      // Et signal til en diamant moduleres rundt grunnverdien (kun denne parameteren).
+      if (sourceNode.type === SIGNAL_NODE_TYPE) {
+        if (graph.edges.some((e) => e.id === id)) {
+          set({ notice: 'Denne forbindelsen finnes allerede.' })
+          return false
+        }
+        set({
+          graph: {
+            ...graph,
+            edges: [
+              ...graph.edges,
+              {
+                id, source, sourcePort, target, targetPort,
+                kind: 'drive',
+                drive: { ...DEFAULT_DRIVE, param: key },
+              },
+            ],
+          },
+          notice: `«${param.label}» styres nå av «${sourceNode.title}». Marker «${targetNode.title}» for å justere styrken.`,
+        })
+        return true
+      }
+
       set({
         graph: {
           ...graph,
@@ -848,11 +878,15 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   setSettings: (patch) =>
     set((s) => ({ graph: { ...s.graph, settings: { ...s.graph.settings, ...patch } } })),
 
-  setDrives: (id, keys) =>
+  setDrive: (edgeId, patch) =>
     set((s) => ({
       graph: {
         ...s.graph,
-        nodes: s.graph.nodes.map((n) => (n.id === id ? { ...n, drives: [...keys] } : n)),
+        edges: s.graph.edges.map((e) =>
+          e.id === edgeId && e.kind === 'drive'
+            ? { ...e, drive: { ...DEFAULT_DRIVE, ...e.drive, ...patch } }
+            : e,
+        ),
       },
     })),
 
