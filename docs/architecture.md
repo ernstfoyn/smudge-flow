@@ -190,6 +190,32 @@ Blokker lagres i `localStorage` og kan eksporteres/importeres som JSON.
 
 ## 4. Automatisert looping
 
+### Kurvenoder (`curve.*`)
+
+Egne, frittstående noder i kategorien **Kurver**. Hver node lager én løkkesikker
+verdi og styrer hvilken som helst tallparameter via diamanten på målnoden.
+
+| Node | Form |
+|---|---|
+| `curve.sine` | Sinus |
+| `curve.triangle` | Trekant |
+| `curve.saw` | Sagtann |
+| `curve.square` | Firkant, med `width` (pulsbredde) |
+| `curve.noise` | Løkkesikker støy (`detail`, `seed`) |
+| `curve.ease` | Myk opp-og-ned (smoothstep) |
+| `curve.bounce` | Sprett (skarpe bunner) |
+| `curve.spring` | Dempet svingning (`ripples`, `damping`) |
+| `curve.steps` | Trapp (`detail` = antall trinn) |
+| `curve.hold` | Tilfeldig trinn / sample & hold |
+
+Felles parametere: `cycles` (heltall per loop), `phase` (0..1), `min`, `max`.
+Utgangene er `value` (min..max) og `inverse` (`min + max − value`), så én kurve
+kan styre to parametere i motfase.
+
+Formene ligger i `src/engine/animation/curves.ts`. Alle er periodiske med
+periode 1, og `cycles` er et heltall, så verdien ved frame 0 er lik verdien ved
+frame N. Dekket av `tests/curves.test.ts`.
+
 ### Loop-generatoren (`source.loop`)
 
 Lager verdier som er **løkkesikre**: verdien ved frame 0 er identisk med
@@ -231,10 +257,12 @@ begge nodene med et fornuftig utgangspunkt.
 ### Parameter-koblinger
 
 En node kan styre en parameter i en annen node. I UI-et: dra fra en
-tallutgang til den blå diamanten ved parameteren i nodekortet.
+tallutgang til den blå diamanten ved parameteren i nodekortet. Kortet viser de
+fire første tallparametrene; **Vis alle** åpner resten. Parametere som er
+koblet vises alltid, slik at koblingen ikke mister håndtaket sitt.
 
 ```
-source.loop ──value──▶ modifier.raster.param:cellSize
+curve.sine ──value──▶ modifier.raster.param:cellSize
 ```
 
 Motoren løser parametrene i rekkefølgen:

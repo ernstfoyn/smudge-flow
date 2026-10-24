@@ -9,6 +9,7 @@ import { blob3D } from './source/blob3D'
 import { objSource } from './source/objSource'
 import { noise } from './source/noise'
 import { voronoi } from './source/voronoi'
+import { curveNodes } from './curve/curves'
 import { transform2D } from './modifier/transform2D'
 import { motion2D } from './modifier/motion2D'
 import { smudgeDeform } from './modifier/smudgeDeform'
@@ -42,13 +43,15 @@ export const registry = new NodeRegistry().registerAll([
   gradientSource,
   motionGraphicsSource,
   imageSource,
-  loopSource,
   mesh3D,
   text3D,
   blob3D,
   objSource,
   noise,
   voronoi,
+  // Kurver — frittstående verdier som styrer parametere
+  ...curveNodes,
+  loopSource,
   // Modifikatorer
   transform2D,
   motion2D,

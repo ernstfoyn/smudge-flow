@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '../../engine/types'
+import { loopedNoise } from '../../engine/animation/curves'
 
 export type LoopAlgorithm = 'sine' | 'triangle' | 'saw' | 'square' | 'noise'
 export type LoopWindow = 'none' | 'pingpong' | 'cosine'
@@ -25,27 +26,6 @@ export interface LoopParams {
 }
 
 const TWO_PI = Math.PI * 2
-
-/** Deterministisk hash — samme inngang gir samme utdata, alltid. */
-function hash(n: number, seed: number): number {
-  const s = Math.sin((n + seed * 101.3) * 127.1) * 43758.5453
-  return s - Math.floor(s)
-}
-
-/**
- * Støy som er *periodisk* over loopen: interpolerer mellom hash-verdier på
- * et sirkulært gitter, slik at siste punkt == første punkt.
- */
-function loopedNoise(t: number, detail: number, seed: number): number {
-  const n = Math.max(2, Math.round(detail))
-  const scaled = t * n
-  const i = Math.floor(scaled)
-  const f = scaled - i
-  const a = hash(i % n, seed)
-  const b = hash((i + 1) % n, seed)
-  const u = f * f * (3 - 2 * f) // smoothstep
-  return (a + (b - a) * u) * 2 - 1
-}
 
 function wave(algorithm: LoopAlgorithm, t: number, params: LoopParams): number {
   switch (algorithm) {
@@ -90,9 +70,9 @@ function applyWindow(phase: number, window: LoopWindow): number {
 export const loopSource: NodeDefinition<LoopParams> = {
   type: 'source.loop',
   label: 'Loop-generator',
-  category: 'source',
+  category: 'curve',
   description:
-    'Genererer løkkesikre verdier. Koble utgangen «Verdi» til en parameter for å automatisere den.',
+    'Alt-i-ett kurve med vindu: sinus, trekant, sag, firkant og støy. Koble «Verdi» til en parameter for å automatisere den.',
   inputs: [],
   outputs: [
     { id: 'value', label: 'Verdi', type: 'number' },

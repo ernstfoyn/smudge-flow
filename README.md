@@ -62,7 +62,8 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `source.gradient` | kilde | Orbit `gradient.js` + `makeGradient()` |
 | `source.motionGraphics` | kilde | Orbit `motion-graphics.js` (prikkefelt, fliser, vifte, striper, ovaler) |
 | `source.image` | kilde | Smudge `trailTexture.js` (bilde/video) |
-| `source.loop` | kilde | Ny — løkkesikre verdier fra loop-algoritmer |
+| `curve.*` | kurve | Ny — frittstående løkkesikre kurver: sinus, trekant, sagtann, firkant/puls, støy, myk puls, sprett, fjær, trapp, tilfeldig trinn |
+| `source.loop` | kurve | Ny — alt-i-ett loop-generator med vindu (pingpong/cosine) |
 | `source.mesh3D` | kilde | Ny — prosedural 3D-geometri (boks/kule/torus/plan/sylinder/ikosaeder) |
 | `source.blob3D` | kilde | Smudge `blob.glsl.js` — raymarchet metaball-form |
 | `source.obj` | kilde | Orbit `obj-import.js` — importerte 3D-modeller |

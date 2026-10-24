@@ -296,7 +296,7 @@ export type Outputs = Record<string, unknown>
 export interface NodeDefinition<P = Record<string, unknown>> {
   type: string
   label: string
-  category: 'source' | 'modifier' | 'composite' | 'output'
+  category: 'source' | 'curve' | 'modifier' | 'composite' | 'output'
   /** Kort forklaring som vises i paletten og i noden. */
   description?: string
   inputs: readonly PortDef[]

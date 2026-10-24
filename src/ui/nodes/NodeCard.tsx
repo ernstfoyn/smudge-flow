@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import type { CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { registry } from '../../nodes'
 import { useGraphStore } from '../../state/useGraphStore'
 import { useConnectionDrag } from '../../state/useConnectionDrag'
@@ -9,6 +9,7 @@ import { PARAM_META, paramPortCompatible, portMeta, valuePortsCompatible } from 
 
 const CATEGORY_STYLE: Record<string, string> = {
   source: 'border-cyan-500/60 text-cyan-300',
+  curve: 'border-blue-400/60 text-blue-300',
   modifier: 'border-fuchsia-500/60 text-fuchsia-300',
   composite: 'border-amber-500/60 text-amber-300',
   output: 'border-lime-500/60 text-lime-300',
@@ -106,6 +107,7 @@ export function NodeCard({ id, selected }: NodeProps) {
   const edges = useGraphStore((s) => s.graph.edges)
   const select = useGraphStore((s) => s.select)
   const drag = useConnectionDrag((s) => s.drag)
+  const [showAllParams, setShowAllParams] = useState(false)
 
   if (!node) return null
 
@@ -132,8 +134,14 @@ export function NodeCard({ id, selected }: NodeProps) {
   const drivable = paramDefs.filter(
     (p) => (p.type === 'number' || p.type === 'int') && p.animatable !== false,
   )
-  const visibleParams = drivable.slice(0, MAX_VISIBLE_PARAMS)
+  const isDriven = (key: string) =>
+    edges.some((e) => e.kind === 'param' && e.target === id && e.targetParam === key)
+  // Koblede parametere vises alltid, ellers mister kanten håndtaket sitt.
+  const visibleParams = drivable.filter(
+    (p, index) => showAllParams || index < MAX_VISIBLE_PARAMS || isDriven(p.key),
+  )
   const hiddenParams = drivable.length - visibleParams.length
+  const canCollapse = showAllParams && drivable.length > MAX_VISIBLE_PARAMS
 
   /**
    * Koblingstilstand per port mens brukeren drar.
@@ -177,7 +185,7 @@ export function NodeCard({ id, selected }: NodeProps) {
     hasCompatibleTarget =
       drag.direction === 'source'
         ? ports.inputs.some((port) => valuePortsCompatible(drag.type, port.type)) ||
-          (paramPortCompatible(drag.type) && visibleParams.length > 0)
+          (paramPortCompatible(drag.type) && drivable.length > 0)
         : ports.outputs.some((port) => valuePortsCompatible(port.type, drag.type))
   }
   const dimmed = !!drag && drag.nodeId !== id && !hasCompatibleTarget
@@ -307,9 +315,7 @@ export function NodeCard({ id, selected }: NodeProps) {
           </div>
           {visibleParams.map((p) => {
             const state = paramState(p.key)
-            const driven = edges.some(
-              (e) => e.kind === 'param' && e.target === id && e.targetParam === p.key,
-            )
+            const driven = isDriven(p.key)
             return (
               <div
                 key={p.key}
@@ -330,8 +336,17 @@ export function NodeCard({ id, selected }: NodeProps) {
               </div>
             )
           })}
-          {hiddenParams > 0 && (
-            <p className="pt-0.5 text-[9px] text-zinc-600">+{hiddenParams} flere parametere</p>
+          {(hiddenParams > 0 || canCollapse) && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                setShowAllParams((value) => !value)
+              }}
+              className="nodrag nopan mt-0.5 text-[9px] text-sky-300/80 hover:text-sky-200"
+            >
+              {showAllParams ? 'Vis færre parametere' : `Vis alle (+${hiddenParams} flere)`}
+            </button>
           )}
         </div>
       )}
