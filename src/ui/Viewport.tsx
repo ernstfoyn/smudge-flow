@@ -21,7 +21,7 @@ export function Viewport() {
   const state = useRef({
     dirty: true,
     lastFrame: -1,
-    token: 0,
+    busy: false,
     lastTime: 0,
   })
 
@@ -66,23 +66,30 @@ export function Viewport() {
       const changed = frame !== state.current.lastFrame
       if (!changed && !state.current.dirty) return
 
-      state.current.lastFrame = frame
-      state.current.dirty = false
-
       const target = current.nodes.find((n) => n.type === 'output.viewport')
       if (!target) return
 
       const canvas = canvasRef.current
       if (!canvas) return
+      // Én evaluering om gangen. Startes en ny mens den forrige kjører, ville
+      // hver ferdige ramme blitt forkastet — og 3D-grafer ville aldri tegnes.
+      if (state.current.busy) {
+        state.current.dirty = true
+        return
+      }
+
+      state.current.lastFrame = frame
+      state.current.dirty = false
+      state.current.busy = true
+
       // Lerretet er alltid full grafoppløsning; kilden tegnes nedskalert
       // og skaleres opp, slik at previewen blir raskere i store grafer.
       if (canvas.width !== current.settings.width) canvas.width = current.settings.width
       if (canvas.height !== current.settings.height) canvas.height = current.settings.height
 
-      const token = ++state.current.token
       try {
         const outputs = await evaluator.evaluateFrame(current, frame, [target.id])
-        if (!alive || token !== state.current.token) return
+        if (!alive) return
 
         // Behold resultatet, så UI-en kan vise det (maleputen).
         for (const [id, output] of outputs) lastOutputs.set(id, output)
@@ -102,6 +109,8 @@ export function Viewport() {
           console.error('[viewport]', err)
           state.current.dirty = true
         }
+      } finally {
+        state.current.busy = false
       }
     }
 
