@@ -310,8 +310,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
             n.id === target && !n.drives ? { ...n, drives: [] } : n,
           ),
         },
-        selected: target,
-        notice: `«${sourceNode.title}» styrer «${targetNode.title}». Velg parametere under Styring i Egenskaper.`,
+        notice: `«${sourceNode.title}» styrer «${targetNode.title}». Marker kurven eller målnoden og velg parametere i Egenskaper.`,
       })
       return true
     }

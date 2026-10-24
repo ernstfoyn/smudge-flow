@@ -67,6 +67,106 @@ function nodeTitle(graph: Graph, id: string): string {
 }
 
 /** Etikett på en parameter. */
+/**
+ * Avkrysningsliste over parameterne en «Styring»-kobling skal styre.
+ * Vises både på målnoden og på kilden (kurven), slik at du kan velge fra
+ * den noden du har markert.
+ */
+function DrivePicker({
+  id,
+  title,
+  targetId,
+  sourceId,
+  perspective,
+}: {
+  id: string
+  title: string
+  targetId: string
+  sourceId: string
+  perspective: 'source' | 'target'
+}) {
+  const graph = useGraphStore((s) => s.graph)
+  const setDrives = useGraphStore((s) => s.setDrives)
+
+  const target = graph.nodes.find((n) => n.id === targetId)
+  if (!target || target.type === 'group' || !registry.has(target.type)) return null
+
+  const candidates = drivableParams(registry.get(target.type).params)
+  const driven = (target.drives ?? []).filter((key) => candidates.some((p) => p.key === key))
+  const sourceTitle = nodeTitle(graph, sourceId)
+  const targetTitle = nodeTitle(graph, targetId)
+
+  return (
+    <CollapsibleSection
+      id={id}
+      title={title}
+      badge={driven.length}
+      className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2"
+    >
+      <p className="mb-1.5 text-[11px] leading-relaxed text-zinc-400">
+        {perspective === 'source' ? (
+          <>
+            Huk av parameterne på <span className="text-zinc-200">{targetTitle}</span> som skal
+            følge denne kurven.
+          </>
+        ) : (
+          <>
+            Styres av <span className="text-zinc-200">{sourceTitle}</span>. Huk av parameterne som
+            skal følge verdien.
+          </>
+        )}
+      </p>
+
+      <div className="mb-1.5 flex gap-1.5">
+        <button
+          type="button"
+          onClick={() => setDrives(targetId, candidates.map((p) => p.key))}
+          className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
+        >
+          Alle
+        </button>
+        <button
+          type="button"
+          onClick={() => setDrives(targetId, [])}
+          className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
+        >
+          Ingen
+        </button>
+      </div>
+
+      <ul className="flex flex-col gap-0.5">
+        {candidates.map((p) => {
+          const checked = driven.includes(p.key)
+          return (
+            <li key={p.key}>
+              <label className="flex min-w-0 cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800/60">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() =>
+                    setDrives(
+                      targetId,
+                      checked ? driven.filter((key) => key !== p.key) : [...driven, p.key],
+                    )
+                  }
+                  className="h-3.5 w-3.5 shrink-0 accent-sky-400"
+                />
+                <span className="min-w-0 truncate">{p.label}</span>
+              </label>
+            </li>
+          )
+        })}
+      </ul>
+
+      <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+        Verdien settes rett inn i hver valgt parameter og begrenses til parameterens eget område.
+        Justér Min og Max på kurven for å treffe riktig område. En enkeltkobling (diamant)
+        overstyrer styringen for den ene parameteren.
+      </p>
+    </CollapsibleSection>
+  )
+}
+
 function paramLabel(node: GraphNode, key?: string): string {
   if (!key) return ''
   return nodeParamDefs(node).find((p) => p.key === key)?.label ?? key
@@ -76,7 +176,6 @@ export function Inspector() {
   const graph = useGraphStore((s) => s.graph)
   const selected = useGraphStore((s) => s.selected)
   const setParam = useGraphStore((s) => s.setParam)
-  const setDrives = useGraphStore((s) => s.setDrives)
   const resetParams = useGraphStore((s) => s.resetParams)
   const removeNode = useGraphStore((s) => s.removeNode)
   const toggleNode = useGraphStore((s) => s.toggleNode)
@@ -413,6 +512,19 @@ export function Inspector() {
         </p>
       )}
 
+      {outgoing
+        .filter((edge) => edge.kind === 'drive')
+        .map((edge) => (
+          <DrivePicker
+            key={edge.id}
+            id={`inspector.drive.out.${edge.target}`}
+            title={`Styrer «${nodeTitle(graph, edge.target)}»`}
+            targetId={edge.target}
+            sourceId={node.id}
+            perspective="source"
+          />
+        ))}
+
       {layerPorts.map((port) => {
         const edges = graph.edges.filter((e) => e.target === node.id && e.targetPort === port.id)
         const layersParam = params.find((p) => p.type === 'layers')
@@ -558,67 +670,13 @@ export function Inspector() {
       })}
 
       {driveEdge && (
-        <CollapsibleSection
+        <DrivePicker
           id="inspector.drive"
           title="Styring"
-          badge={drivenKeys.length}
-          className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2"
-        >
-          <p className="mb-1.5 text-[11px] leading-relaxed text-zinc-400">
-            Styres av{' '}
-            <span className="text-zinc-200">{nodeTitle(graph, driveEdge.source)}</span>. Huk av
-            parameterne som skal følge verdien.
-          </p>
-
-          <div className="mb-1.5 flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => setDrives(node.id, driveCandidates.map((p) => p.key))}
-              className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
-            >
-              Alle
-            </button>
-            <button
-              type="button"
-              onClick={() => setDrives(node.id, [])}
-              className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
-            >
-              Ingen
-            </button>
-          </div>
-
-          <ul className="flex flex-col gap-0.5">
-            {driveCandidates.map((p) => {
-              const checked = drivenKeys.includes(p.key)
-              return (
-                <li key={p.key}>
-                  <label className="flex min-w-0 cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800/60">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() =>
-                        setDrives(
-                          node.id,
-                          checked
-                            ? drivenKeys.filter((key) => key !== p.key)
-                            : [...drivenKeys, p.key],
-                        )
-                      }
-                      className="h-3.5 w-3.5 shrink-0 accent-sky-400"
-                    />
-                    <span className="min-w-0 truncate">{p.label}</span>
-                  </label>
-                </li>
-              )
-            })}
-          </ul>
-
-          <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
-            Verdien settes rett inn i hver valgt parameter og begrenses til parameterens eget
-            område. Justér Min og Max på kurven for å treffe riktig område. En enkeltkobling
-            (diamant) overstyrer styringen for den ene parameteren.
-          </p>
-        </CollapsibleSection>
+          targetId={node.id}
+          sourceId={driveEdge.source}
+          perspective="target"
+        />
       )}
 
       {node.type === 'modifier.trail' && <TrailPad nodeId={node.id} />}

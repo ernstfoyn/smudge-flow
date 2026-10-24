@@ -105,7 +105,13 @@ describe('styring i butikken', () => {
     const edge = state.graph.edges.find((e) => e.kind === 'drive')
     expect(edge).toMatchObject({ source: curve, target: raster, targetPort: DRIVE_PORT_ID })
     expect(state.graph.nodes.find((n) => n.id === raster)?.drives).toEqual([])
-    expect(state.selected).toBe(raster)
+  })
+
+  it('flytter ikke markeringen når du kobler', () => {
+    const { curve, raster } = setup()
+    useGraphStore.getState().select(curve)
+    useGraphStore.getState().connect(curve, 'value', raster, DRIVE_PORT_ID)
+    expect(useGraphStore.getState().selected).toBe(curve)
   })
 
   it('lar brukeren velge parametere, og husker valget', () => {
