@@ -91,6 +91,10 @@ kildeporten. Sidepanelene er delt i sammenleggbare seksjoner, og nodepaletten
 har søk. Åpen/lukket-tilstand huskes i `localStorage` under
 `smudgeflow.ui.open.*`.
 
+Et Houdini-inspirert hurtigsøk ligger på lerretet: **Tab** åpner en søkbar
+nodeliste ved musepekeren, piltastene velger, og **Enter** legger noden inn
+på samme sted. Tab stjeles ikke fra felt og andre redigerbare elementer.
+
 ---
 
 ## 3. Gjenbrukbare workflows: gruppe-noder

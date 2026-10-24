@@ -4,22 +4,8 @@ import { registry } from '../../nodes'
 import type { NodeDefinition } from '../../engine/types'
 import { useGraphStore } from '../../state/useGraphStore'
 import { CollapsibleSection } from '../primitives/CollapsibleSection'
-
-const CATEGORY_LABEL: Record<string, string> = {
-  source: 'Kilder',
-  modifier: 'Modifikatorer',
-  composite: 'Kompositt',
-  output: 'Output',
-}
-
-const CATEGORY_COLOR: Record<string, string> = {
-  source: '#22d3ee',
-  modifier: '#e879f9',
-  composite: '#fbbf24',
-  output: '#a3e635',
-}
-
-const CATEGORIES = ['source', 'modifier', 'composite', 'output'] as const
+import { CATEGORY_COLOR, CATEGORY_LABEL, CATEGORY_ORDER } from '../categoryStyle'
+import { searchNodes } from '../nodeSearch'
 
 export function NodePalette() {
   const addNode = useGraphStore((s) => s.addNode)
@@ -55,16 +41,8 @@ export function NodePalette() {
     </button>
   )
 
-  const q = query.trim().toLowerCase()
-  const searchResults = q
-    ? registry
-        .all()
-        .filter((def) =>
-          `${def.label} ${def.type} ${def.description ?? ''} ${CATEGORY_LABEL[def.category] ?? ''}`
-            .toLowerCase()
-            .includes(q),
-        )
-    : []
+  const q = query.trim()
+  const searchResults = q ? searchNodes(registry.all(), q) : []
 
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -121,7 +99,7 @@ export function NodePalette() {
           )}
         </section>
       ) : (
-        CATEGORIES.map((category) => {
+        CATEGORY_ORDER.map((category) => {
           const defs = registry.byCategory(category)
           if (!defs.length) return null
           return (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -22,10 +22,28 @@ import {
   nodePorts,
 } from '../engine/graph'
 import { NodeCard } from './nodes/NodeCard'
+import { NodeTabMenu } from './NodeTabMenu'
 import { PortLegend } from './PortLegend'
 import { PARAM_META, portMeta } from './portStyle'
+import type { NodeDefinition } from '../engine/types'
 
 const nodeTypes = { card: NodeCard }
+
+interface MenuAnchor {
+  x: number
+  y: number
+  host: { left: number; top: number; width: number; height: number }
+}
+
+/** Skal ikke stjele Tab fra felt og andre redigerbare elementer. */
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (target.isContentEditable) return true
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return true
+  return !!target.closest(
+    '[contenteditable="true"], [role="textbox"], [role="searchbox"], [role="combobox"]',
+  )
+}
 
 function FlowInner() {
   const graph = useGraphStore((s) => s.graph)
@@ -44,6 +62,10 @@ function FlowInner() {
   const startDrag = useConnectionDrag((s) => s.start)
   const endDrag = useConnectionDrag((s) => s.end)
   const reactFlow = useReactFlow()
+
+  const hostRef = useRef<HTMLDivElement>(null)
+  const pointerRef = useRef<{ x: number; y: number } | null>(null)
+  const [menu, setMenu] = useState<MenuAnchor | null>(null)
 
   useEffect(() => () => useConnectionDrag.getState().end(), [])
 
@@ -249,6 +271,67 @@ function FlowInner() {
   )
 
   /**
+   * Tab åpner hurtigsøket på samme måte som i Houdini. Vi plasserer menyen
+   * ved musepekeren når den er over lerretet, ellers midt på lerretet.
+   *
+   * Unntaket er felt og redigerbare elementer, der Tab fortsatt skal flytte
+   * fokus. Står fokus på en knapp utenfor lerretet, og musepekeren ikke er
+   * over lerretet, lar vi også Tab navigere som normalt.
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || event.repeat || event.defaultPrevented) return
+      if (event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.isComposing || menu) return
+
+      const active = document.activeElement
+      if (isTextEntryTarget(event.target) || isTextEntryTarget(active)) return
+
+      const host = hostRef.current
+      if (!host) return
+
+      const rect = host.getBoundingClientRect()
+      const pointer = pointerRef.current
+      const inside =
+        !!pointer &&
+        pointer.x >= rect.left &&
+        pointer.x <= rect.right &&
+        pointer.y >= rect.top &&
+        pointer.y <= rect.bottom
+      const focusInCanvas = active instanceof HTMLElement && host.contains(active)
+
+      if (!inside && !focusInCanvas && active !== document.body) return
+
+      event.preventDefault()
+      setMenu({
+        x: inside ? pointer.x : rect.left + rect.width / 2,
+        y: inside ? pointer.y : rect.top + rect.height / 2,
+        host: {
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+        },
+      })
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [menu])
+
+  const closeTabMenu = useCallback(() => setMenu(null), [])
+
+  const pickNode = useCallback(
+    (def: NodeDefinition) => {
+      if (!menu) return
+      const position = reactFlow.screenToFlowPosition({ x: menu.x, y: menu.y })
+      addNode(def.type, position)
+      setMenu(null)
+    },
+    [addNode, menu, reactFlow],
+  )
+
+  /**
    * Delete/Backspace sletter det som er merket.
    *
    * Vi håndterer dette selv i stedet for å la React Flow gjøre det, fordi
@@ -282,9 +365,16 @@ function FlowInner() {
 
   return (
     <div
+      ref={hostRef}
       className="relative h-full w-full"
       onDrop={onDrop}
       onDragOver={(e) => e.preventDefault()}
+      onPointerMove={(event) => {
+        pointerRef.current = { x: event.clientX, y: event.clientY }
+      }}
+      onPointerLeave={() => {
+        pointerRef.current = null
+      }}
     >
       <ReactFlow
         nodes={nodes}
@@ -365,8 +455,17 @@ function FlowInner() {
       )}
 
       <span className="pointer-events-none absolute bottom-2 left-2 text-[10px] text-zinc-600">
-        Dra noder fra paletten hit · Shift-klikk for å merke flere · Delete fjerner valgte noder og koblinger
+        Tab: legg til node · Dra noder fra paletten hit · Shift-klikk for å merke flere · Delete fjerner valgte noder og koblinger
       </span>
+
+      {menu && (
+        <NodeTabMenu
+          anchor={{ x: menu.x, y: menu.y }}
+          host={menu.host}
+          onPick={pickNode}
+          onClose={closeTabMenu}
+        />
+      )}
     </div>
   )
 }
