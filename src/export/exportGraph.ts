@@ -1,6 +1,7 @@
 import type { Graph, NodeId } from '../engine/types'
 import type { Evaluator } from '../engine/evaluator'
 import { encodeFrames, type EncodeResult } from './encodeFrames'
+import type { OutputFormat } from './outputFormat'
 import type { BrowserRenderServices } from '../render/RenderServices'
 
 export interface ExportOptions {
@@ -9,7 +10,7 @@ export interface ExportOptions {
   /** Node-ID-en som definerer leveransen. */
   outputNodeId: NodeId
   canvas: HTMLCanvasElement
-  prefer?: 'mp4' | 'webm'
+  prefer?: OutputFormat
   onProgress?: (progress: number, frame: number, total: number) => void
   signal?: AbortSignal
   /**

@@ -26,7 +26,7 @@ grafen topologisk for hver frame og sender resultatet til rendereren.
 ```
 source.*  ──▶  modifier.*  ──▶  composite.*  ──▶  output.*
 (gradient,     (transform,      (blend)          (viewport,
- generativ      raster, blur,                     MP4-eksport)
+ generativ      raster, blur,                     videoeksport)
  grafikk,       pixelate,
  bilde)         warp)
 ```
@@ -34,7 +34,7 @@ source.*  ──▶  modifier.*  ──▶  composite.*  ──▶  output.*
 **Determinisme er en del av API-et.** Alt som evalueres, er en ren funksjon av
 `(inputs, params, ctx.frame, settings)`. Ingen `Date.now()`, ingen
 `Math.random()`, ingen `requestAnimationFrame` inne i en node. Derfor er
-forhåndsvisningen og MP4-eksporten bit-identiske, og lengden på eksporten er
+forhåndsvisningen og videoeksporten bit-identiske, og lengden på eksporten er
 eksakt `frames / fps` sekunder.
 
 ---
@@ -83,7 +83,7 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `scene.camera` | kompositt | Ny — 3D-kamera som animerbar verdi |
 | `scene.lights` | kompositt | Ny — belysning som animerbar verdi |
 | `output.viewport` | output | Ny — merker leveransen for preview |
-| `output.export` | output | Ny — merker leveransen for MP4 |
+| `output.export` | output | Ny — merker leveransen for videoeksport (MP4/WebM) |
 
 ### Kombinere flere lag
 
@@ -186,6 +186,19 @@ Den kobles naturlig etter trail-laget, så du kan male inn i formen:
 ```
 bilde ─▶ modifier.trail ─▶ source.blob3D ─▶ modifier.look.chromatic ─▶ viewport
 ```
+
+---
+
+## Eksport
+
+Eksport-panelet lar deg velge **filformat** (MP4/H.264 eller WebM/VP9),
+**bildeformat** (1:1, 16:9, 9:16, 4:5, 4:3, 21:9 eller egendefinert) og
+eksakt bredde/høyde. Bildeformatet oppdaterer både forhåndsvisningen og
+eksporten, og den lengste siden beholdes når du bytter format — så
+oppløsningen ikke krymper hver gang du veksler mellom landskap og portrett.
+
+Valgene lagres sammen med grafen. Hvis grafen har en `output.export`-node,
+følger filformatet den nodens innstilling; ellers brukes prosjektinnstillingen.
 
 ---
 

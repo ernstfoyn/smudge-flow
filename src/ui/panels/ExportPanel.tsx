@@ -2,6 +2,15 @@ import { useRef, useState } from 'react'
 import { useGraphStore } from '../../state/useGraphStore'
 import { evaluator, renderServices } from '../../state/studio'
 import { exportGraph } from '../../export/exportGraph'
+import {
+  ASPECT_PRESETS,
+  OUTPUT_FORMATS,
+  aspectPresetFor,
+  clampOutputSize,
+  dimensionsForAspect,
+  resolveOutputFormat,
+  type OutputFormat,
+} from '../../export/outputFormat'
 
 interface Status {
   kind: 'idle' | 'running' | 'done' | 'error'
@@ -14,12 +23,28 @@ interface Status {
 export function ExportPanel() {
   const graph = useGraphStore((s) => s.graph)
   const setSettings = useGraphStore((s) => s.setSettings)
+  const setParam = useGraphStore((s) => s.setParam)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const [status, setStatus] = useState<Status>({ kind: 'idle', message: 'Klar', progress: 0 })
 
-  const target = graph.nodes.find((n) => n.type === 'output.export' || n.type === 'output.viewport')
-  const prefer = graph.nodes.find((n) => n.type === 'output.export')?.params.format === 'webm' ? 'webm' : 'mp4'
+  const exportNode = graph.nodes.find((n) => n.type === 'output.export')
+  const target = exportNode ?? graph.nodes.find((n) => n.type === 'output.viewport')
+  const format = resolveOutputFormat(exportNode?.params.format, graph.settings.exportFormat)
+  const aspect = aspectPresetFor(graph.settings.width, graph.settings.height)
+  const aspectPreset = ASPECT_PRESETS.find((preset) => preset.id === aspect)
+  const duration = graph.settings.frames / graph.settings.fps
+
+  const setFormat = (next: OutputFormat) => {
+    setSettings({ exportFormat: next })
+    if (exportNode) setParam(exportNode.id, 'format', next)
+  }
+
+  const applyAspect = (id: string) => {
+    const preset = ASPECT_PRESETS.find((item) => item.id === id)
+    if (!preset) return
+    setSettings(dimensionsForAspect(preset.ratio, graph.settings.width, graph.settings.height))
+  }
 
   const run = async () => {
     if (!target) {
@@ -38,13 +63,13 @@ export function ExportPanel() {
 
     try {
       // Evaluer motoren mot eksport-node-ID-en (eller viewport hvis ingen finnes).
-      const exportNode = graph.nodes.find((n) => n.type === 'output.export') ?? target
+      const outputNode = exportNode ?? target
       const result = await exportGraph({
         graph,
         evaluator,
-        outputNodeId: exportNode.id,
+        outputNodeId: outputNode.id,
         canvas,
-        prefer,
+        prefer: format,
         signal: controller.signal,
         render: renderServices,
         onProgress: (p, frame, total) =>
@@ -77,9 +102,40 @@ export function ExportPanel() {
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-3 p-3">
+    <div className="flex h-full min-w-0 flex-col gap-3 overflow-y-auto p-3">
       <section className="flex min-w-0 flex-col gap-2">
         <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Format</h3>
+
+        <label className="flex min-w-0 items-center gap-2">
+          <span className="w-20 shrink-0 text-[11px] text-zinc-400">Filformat</span>
+          <select
+            value={format}
+            onChange={(e) => setFormat(e.target.value as OutputFormat)}
+            className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100"
+          >
+            {OUTPUT_FORMATS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex min-w-0 items-center gap-2">
+          <span className="w-20 shrink-0 text-[11px] text-zinc-400">Bildeformat</span>
+          <select
+            value={aspect}
+            onChange={(e) => applyAspect(e.target.value)}
+            className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100"
+          >
+            {ASPECT_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
+            {aspect === 'custom' && <option value="custom">Egendefinert</option>}
+          </select>
+        </label>
 
         <label className="flex min-w-0 items-center gap-2">
           <span className="w-20 shrink-0 text-[11px] text-zinc-400">Bredde</span>
@@ -90,9 +146,9 @@ export function ExportPanel() {
             step={2}
             value={graph.settings.width}
             onChange={(e) => {
-              const w = Math.max(64, Number(e.target.value) || 64)
-              const h = graph.settings.height
-              setSettings({ width: w, height: Math.round((w * h) / graph.settings.width) })
+              setSettings({
+                width: clampOutputSize(Number(e.target.value), graph.settings.width),
+              })
             }}
             className="w-20 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-right tabular-nums text-zinc-100"
           />
@@ -107,17 +163,18 @@ export function ExportPanel() {
             step={2}
             value={graph.settings.height}
             onChange={(e) => {
-              const h = Math.max(64, Number(e.target.value) || 64)
-              const w = graph.settings.width
-              setSettings({ height: h, width: Math.round((h * w) / graph.settings.height) })
+              setSettings({
+                height: clampOutputSize(Number(e.target.value), graph.settings.height),
+              })
             }}
             className="w-20 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-right tabular-nums text-zinc-100"
           />
         </label>
 
         <p className="text-[10px] leading-relaxed text-zinc-500">
-          {graph.settings.fps} fps · {graph.settings.frames} frames ·{' '}
-          {(graph.settings.frames / graph.settings.fps).toFixed(2)} s
+          {graph.settings.width} × {graph.settings.height} px ·{' '}
+          {aspectPreset?.label ?? 'Egendefinert'} · {graph.settings.fps} fps ·{' '}
+          {graph.settings.frames} frames · {duration.toFixed(2)} s
         </p>
       </section>
 
@@ -199,8 +256,7 @@ export function ExportPanel() {
 
       <p className="text-[10px] leading-relaxed text-zinc-600">
         Eksporten kjører SAMME evalueringsmotor som forhåndsvisningen, én frame om gangen,
-        med eksplisitte tidsstempler. Derfor blir lengden eksakt{' '}
-        {(graph.settings.frames / graph.settings.fps).toFixed(2)} s.
+        med eksplisitte tidsstempler. Derfor blir lengden eksakt {duration.toFixed(2)} s.
       </p>
     </div>
   )

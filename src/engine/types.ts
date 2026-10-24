@@ -186,6 +186,8 @@ export interface GraphSettings {
   background: string
   /** Skalering av forhåndsvisningen (1 = full oppløsning). */
   previewScale?: number
+  /** Foretrukket container/kodek for videoeksport. */
+  exportFormat?: 'mp4' | 'webm'
 }
 
 export interface Graph {

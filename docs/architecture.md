@@ -438,6 +438,19 @@ på en eksplisitt buffer og sendes til MediaBunny med et eksplisitt tidsstempel
 Eksporten setter renderstørrelsen til full oppløsning, uansett hva
 forhåndsvisningen er nedskalert til.
 
+Eksportformatet velges i eksportpanelet:
+
+- **Filformat:** MP4/H.264 eller WebM/VP9. Nettleserens støtte avgjør om
+  kodeken kan brukes, med trygg fallback til nærmeste støttede kodek.
+- **Bildeformat:** 1:1, 16:9, 9:16, 4:5, 4:3, 21:9 eller egendefinert
+  bredde/høyde. Når et format velges, beholdes den lengste siden, slik at
+  gjentatt veksling mellom landskap og portrett ikke krymper oppløsningen.
+  Dimensjonene rundes til partall og holdes innenfor 64–4096 piksler.
+
+Regnestykkene ligger i `src/export/outputFormat.ts` og er dekket av
+`tests/outputFormat.test.ts`. Filformatet ligger i `graph.settings.exportFormat`
+når grafen ikke har en `output.export`-node; noden overstyrer prosjektvalget.
+
 ---
 
 ## 11. Feil håndtert

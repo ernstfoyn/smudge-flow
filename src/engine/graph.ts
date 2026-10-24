@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS: GraphSettings = {
   loop: true,
   background: '#0b0b12',
   previewScale: 1,
+  exportFormat: 'mp4',
 }
 
 /** Prefiks for porter som driver en parameter i stedet for å lege en verdi. */

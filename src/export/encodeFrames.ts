@@ -12,6 +12,7 @@
  */
 
 import type { MediaBunnyApi } from './vendor/mediabunny-types'
+import type { OutputFormat } from './outputFormat'
 
 const MEDIABUNNY = () =>
   // @ts-expect-error — den vendorede byggingen har ingen deklarasjonsfil
@@ -23,14 +24,14 @@ export interface EncodeOptions {
   frames: number
   /** Tegner den gitte rammen. Må vente på ferdigstillelse. */
   render: (frame: number) => Promise<void> | void
-  prefer?: 'mp4' | 'webm'
+  prefer?: OutputFormat
   onProgress?: (progress: number, frame: number, total: number) => void
   signal?: AbortSignal
 }
 
 export interface EncodeResult {
   blob: Blob
-  extension: 'mp4' | 'webm'
+  extension: OutputFormat
   fps: number
   frames: number
   duration: number
@@ -61,7 +62,7 @@ export async function encodeFrames({
 
   let codec = ''
   let format: any
-  let extension: 'mp4' | 'webm' = 'mp4'
+  let extension: OutputFormat = 'mp4'
 
   const useAvc = () => {
     codec = 'avc'

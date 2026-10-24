@@ -20,13 +20,13 @@ export const viewport: NodeDefinition = {
 
 export const exportOutput: NodeDefinition = {
   type: 'output.export',
-  label: 'MP4-eksport',
+  label: 'Videoeksport',
   category: 'output',
   inputs: [{ id: 'frame', label: 'Frame', type: 'canvas' }],
   outputs: [],
   params: [
     {
-      key: 'format', label: 'Format', type: 'enum', default: 'mp4',
+      key: 'format', label: 'Filformat', type: 'enum', default: 'mp4',
       options: [
         { value: 'mp4', label: 'MP4 (H.264)' },
         { value: 'webm', label: 'WebM (VP9)' },
