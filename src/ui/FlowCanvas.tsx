@@ -414,14 +414,14 @@ function FlowInner() {
         minZoom={0.2}
         maxZoom={2}
       >
-        <Background color={theme === 'dark' ? '#27272a' : '#d4d4d8'} gap={22} size={1} />
+        <Background color={theme === 'dark' ? '#27272a' : '#c0c0c8'} gap={22} size={1} />
         <Controls className="!border-zinc-700 !bg-zinc-900 !fill-zinc-400" />
         <MiniMap
           pannable
           zoomable
           className="!border-zinc-700 !bg-zinc-900"
           style={{ width: 170, height: 120 }}
-          maskColor={theme === 'dark' ? 'rgba(9, 9, 11, 0.72)' : 'rgba(250, 250, 250, 0.72)'}
+          maskColor={theme === 'dark' ? 'rgba(9, 9, 11, 0.72)' : 'rgba(230, 230, 234, 0.72)'}
           nodeColor={() => '#4d7c0f'}
           nodeStrokeColor="#a3e635"
           nodeBorderRadius={3}

@@ -24,16 +24,17 @@
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --color-zinc-950: #fafafa;
-  --color-zinc-900: #ffffff;
-  --color-zinc-800: #e4e4e7;
-  --color-zinc-700: #d4d4d8;
-  --color-zinc-600: #8b8b95;
-  --color-zinc-500: #71717a;
-  --color-zinc-400: #52525b;
-  --color-zinc-300: #3f3f46;
-  --color-zinc-200: #27272a;
-  --color-zinc-100: #18181b;
+  /* Bakgrunn → paneler → kanter → tekst. Hvert nivå skiller seg fra det over. */
+  --color-zinc-950: #e6e6ea;
+  --color-zinc-900: #f6f6f8;
+  --color-zinc-800: #dcdce2;
+  --color-zinc-700: #c0c0c8;
+  --color-zinc-600: #85858f;
+  --color-zinc-500: #6c6c77;
+  --color-zinc-400: #4e4e58;
+  --color-zinc-300: #3a3a44;
+  --color-zinc-200: #26262e;
+  --color-zinc-100: #17171d;
 
   --color-lime-100: #365314;
   --color-lime-200: #3f6212;
@@ -53,13 +54,13 @@
   --color-cyan-300: #0e7490;
   --color-fuchsia-300: #a21caf;
 
-  --controls-bg: #ffffff;
-  --controls-border: #d4d4d8;
-  --controls-fill: #52525b;
-  --controls-hover: #f4f4f5;
-  --scrollbar: #d4d4d8;
-  --stage-bg: #e4e4e7;
-  --stage-badge: rgba(255, 255, 255, 0.85);
+  --controls-bg: #f6f6f8;
+  --controls-border: #c0c0c8;
+  --controls-fill: #4e4e58;
+  --controls-hover: #dcdce2;
+  --scrollbar: #b4b4bd;
+  --stage-bg: #d2d2d9;
+  --stage-badge: rgba(246, 246, 248, 0.8);
 }
 
 html,
