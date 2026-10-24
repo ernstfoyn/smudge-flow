@@ -182,6 +182,11 @@ med én gang hva du maler.
 fullskjerm-kvad marsjerer stråler gjennom et avstandsfelt bygget av smeltede
 primitiver, med bildet pakket på via triplanar mapping.
 
+Bildeinngangen er **valgfri**. Legger du til en Blob uten å koble noe til,
+pakkes en fargegradient rundt formen (to farger under «Farge A/B (uten
+bilde)»), så den fungerer som en frittstående kilde. Kobler du til et bilde,
+brukes det i stedet.
+
 Den kobles naturlig etter trail-laget, så du kan male inn i formen:
 
 ```

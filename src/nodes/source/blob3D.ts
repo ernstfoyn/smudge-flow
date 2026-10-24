@@ -1,4 +1,4 @@
-import type { NodeDefinition } from '../../engine/types'
+import type { EvalContext, NodeDefinition } from '../../engine/types'
 
 export type BlobShape =
   | 'sphere'
@@ -33,12 +33,40 @@ export interface BlobParams {
   backgroundMode: 'solid' | 'gradient'
   backgroundA: string
   backgroundB: string
+  /** Fargene på reserveteksturen som brukes når ingen bilde er koblet til. */
+  imageA: string
+  imageB: string
 }
 
 const SHAPES: BlobShape[] = [
   'sphere', 'box', 'tetra', 'octa', 'torus', 'capsule', 'hexagon', 'heart', 'crescent',
 ]
 const MATERIALS: BlobMaterial[] = ['matte', 'chrome', 'glass', 'goo', 'obsidian', 'hologram']
+
+/** Enkel, deterministisk reservetekstur: diagonal gradient med et lyst parti. */
+function fallbackTexture(ctx: EvalContext, p: BlobParams): CanvasImageSource {
+  const fallback = ctx.render.canvas(`${ctx.scopeKey}:fallback`)
+  const c = fallback.ctx
+  const { width, height } = fallback
+
+  const linear = c.createLinearGradient(0, 0, width, height)
+  linear.addColorStop(0, String(p.imageA))
+  linear.addColorStop(1, String(p.imageB))
+  c.fillStyle = linear
+  c.fillRect(0, 0, width, height)
+
+  const radial = c.createRadialGradient(
+    width * 0.3, height * 0.3, 0, width * 0.3, height * 0.3, Math.max(width, height) * 0.6,
+  )
+  radial.addColorStop(0, String(p.imageB))
+  radial.addColorStop(1, 'rgba(0,0,0,0)')
+  c.globalAlpha = 0.55
+  c.fillStyle = radial
+  c.fillRect(0, 0, width, height)
+  c.globalAlpha = 1
+
+  return fallback.canvas
+}
 
 /**
  * Blob-mode — SDF-raymarcheren.
@@ -53,8 +81,8 @@ export const blob3D: NodeDefinition<BlobParams> = {
   label: 'Blob',
   category: 'source',
   description:
-    'Raymarchet metaball-form med bildet pakket på. Kan kobles til trail-laget for å males inn i formen.',
-  inputs: [{ id: 'in', label: 'Bilde', type: 'drawable' }],
+    'Raymarchet metaball-form. Bildet er valgfritt: uten bilde brukes en fargegradient. Koble til trail-laget for å male inn i formen.',
+  inputs: [{ id: 'in', label: 'Bilde', type: 'drawable', optional: true }],
   outputs: [{ id: 'out', label: 'Bilde', type: 'canvas' }],
   params: [
     {
@@ -104,15 +132,14 @@ export const blob3D: NodeDefinition<BlobParams> = {
     },
     { key: 'backgroundA', label: 'Bakgrunn A', type: 'color', default: '#241f3d' },
     { key: 'backgroundB', label: 'Bakgrunn B', type: 'color', default: '#05050a' },
+    { key: 'imageA', label: 'Farge A (uten bilde)', type: 'color', default: '#8b5cf6' },
+    { key: 'imageB', label: 'Farge B (uten bilde)', type: 'color', default: '#22d3ee' },
   ],
   async evaluate(ctx, { in: input }, p) {
     const target = ctx.render.canvas(ctx.scopeKey)
-    const source = input as CanvasImageSource | undefined
-
-    if (!source) {
-      target.ctx.clearRect(0, 0, target.width, target.height)
-      return { out: target.canvas }
-    }
+    // Uten tilkoblet bilde pakkes en fargegradient rundt formen, så Blob
+    // fungerer som en frittstående kilde.
+    const source = (input as CanvasImageSource | undefined) ?? fallbackTexture(ctx, p)
 
     const { blobFragmentShader } = await import('../../render/shaders/blob.glsl')
 
