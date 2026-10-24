@@ -12,7 +12,7 @@ export function PortLegend() {
   const [open, setOpen] = usePersistentOpen('flow.portlegend', true)
 
   return (
-    <div className="pointer-events-auto absolute right-3 top-3 z-10 w-[214px] rounded-xl border border-zinc-700/80 bg-zinc-900/90 p-2 shadow-xl backdrop-blur">
+    <div className="pointer-events-auto absolute right-3 top-3 z-10 w-[min(214px,calc(100%-1.5rem))] rounded-xl border border-zinc-700/80 bg-zinc-900/90 p-2 shadow-xl backdrop-blur">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}

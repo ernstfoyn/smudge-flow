@@ -142,3 +142,20 @@ body {
 *::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/*
+ * Skyveknapper har en innebygd minimumsbredde i noen nettlesere. Uten dette
+ * kan de presse seg ut av smale inspector-paneler.
+ */
+input[type='range'] {
+  min-width: 0;
+}
+
+/* Når en skillestripe dras, skal markøren gjelde hele vinduet. */
+body.is-resizing {
+  user-select: none;
+}
+
+body.is-resizing * {
+  cursor: inherit !important;
+}

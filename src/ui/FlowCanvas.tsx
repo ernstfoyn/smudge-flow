@@ -411,7 +411,7 @@ function FlowInner() {
       <PortLegend />
 
       {drag && (
-        <div className="pointer-events-none absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/95 px-3 py-1.5 text-[10px] text-zinc-300 shadow-xl backdrop-blur">
+        <div className="pointer-events-none absolute left-1/2 top-3 z-20 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/95 px-3 py-1.5 text-[10px] text-zinc-300 shadow-xl backdrop-blur">
           <span
             className="h-2.5 w-2.5 shrink-0 rounded-full"
             style={{
@@ -429,7 +429,7 @@ function FlowInner() {
       )}
 
       {selection.length > 0 && (
-        <div className="absolute left-3 top-3 flex items-center gap-2">
+        <div className="absolute left-3 top-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2">
           {selection.length > 1 && (
             <button
               type="button"
@@ -454,7 +454,7 @@ function FlowInner() {
         </div>
       )}
 
-      <span className="pointer-events-none absolute bottom-2 left-2 text-[10px] text-zinc-600">
+      <span className="pointer-events-none absolute bottom-2 left-2 right-2 truncate text-[10px] text-zinc-600">
         Tab: legg til node · Dra noder fra paletten hit · Shift-klikk for å merke flere · Delete fjerner valgte noder og koblinger
       </span>
 

@@ -40,8 +40,8 @@ export function Timeline() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-2 p-3">
-      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+    <div className="flex h-full min-w-0 flex-col gap-2 p-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px]">
         <button
           type="button"
           onClick={toggle}
@@ -96,7 +96,7 @@ export function Timeline() {
           Loop
         </label>
 
-        <span className="ml-auto tabular-nums text-zinc-500">
+        <span className="ml-auto whitespace-nowrap tabular-nums text-zinc-500">
           {(frame / fps).toFixed(2)} / {(frames / fps).toFixed(2)} s
         </span>
       </div>
@@ -107,7 +107,7 @@ export function Timeline() {
         max={Math.max(0, frames - 1)}
         value={frame}
         onChange={(e) => seek(Number(e.target.value))}
-        className="h-1 w-full cursor-pointer accent-lime-400"
+        className="h-1 w-full min-w-0 cursor-pointer accent-lime-400"
       />
 
       <div className="flex-1 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950/60">
@@ -119,16 +119,16 @@ export function Timeline() {
 
         {tracks.map((track) => (
           <div key={`${track.nodeId}:${track.path}`} className="border-b border-zinc-800/70 px-3 py-1.5 last:border-0">
-            <div className="flex items-baseline justify-between">
-              <span className="truncate text-[11px] text-zinc-300">
+            <div className="flex min-w-0 items-baseline justify-between gap-2">
+              <span className="min-w-0 truncate text-[11px] text-zinc-300">
                 {track.nodeTitle} <span className="text-zinc-500">· {track.label}</span>
               </span>
-              <span className="text-[10px] tabular-nums text-zinc-600">
+              <span className="shrink-0 whitespace-nowrap text-[10px] tabular-nums text-zinc-600">
                 {track.frames.length} nøkkel
               </span>
             </div>
 
-            <div className="relative mt-1 h-4 rounded bg-zinc-900">
+            <div className="relative mt-1 h-4 overflow-hidden rounded bg-zinc-900">
               {track.frames.map((f) => (
                 <button
                   key={f}
@@ -163,7 +163,7 @@ export function Timeline() {
             setKeyframe(node.id, p.key, frame, node.params[p.key] ?? p.default)
           }
         }}
-        className="self-start rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+        className="max-w-full self-start whitespace-normal rounded border border-zinc-700 px-2 py-1 text-left text-[11px] text-zinc-300 hover:bg-zinc-800"
       >
         ◆ Keyframe alle parametere i valgt node
       </button>

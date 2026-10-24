@@ -77,12 +77,12 @@ export function ExportPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-3 p-3">
-      <section className="flex flex-col gap-2">
+    <div className="flex min-w-0 flex-col gap-3 p-3">
+      <section className="flex min-w-0 flex-col gap-2">
         <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Format</h3>
 
-        <label className="flex items-center gap-2">
-          <span className="w-20 text-[11px] text-zinc-400">Bredde</span>
+        <label className="flex min-w-0 items-center gap-2">
+          <span className="w-20 shrink-0 text-[11px] text-zinc-400">Bredde</span>
           <input
             type="number"
             min={64}
@@ -98,8 +98,8 @@ export function ExportPanel() {
           />
         </label>
 
-        <label className="flex items-center gap-2">
-          <span className="w-20 text-[11px] text-zinc-400">Høyde</span>
+        <label className="flex min-w-0 items-center gap-2">
+          <span className="w-20 shrink-0 text-[11px] text-zinc-400">Høyde</span>
           <input
             type="number"
             min={64}
@@ -121,16 +121,16 @@ export function ExportPanel() {
         </p>
       </section>
 
-      <section className="flex flex-col gap-2">
+      <section className="flex min-w-0 flex-col gap-2">
         <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
           Forhåndsvisning
         </h3>
-        <label className="flex items-center gap-2">
-          <span className="w-20 text-[11px] text-zinc-400">Kvalitet</span>
+        <label className="flex min-w-0 items-center gap-2">
+          <span className="w-20 shrink-0 text-[11px] text-zinc-400">Kvalitet</span>
           <select
             value={String(graph.settings.previewScale ?? 1)}
             onChange={(e) => setSettings({ previewScale: Number(e.target.value) })}
-            className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100"
+            className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100"
           >
             <option value="1">Full oppløsning (100 %)</option>
             <option value="0.5">Halv oppløsning (50 %)</option>

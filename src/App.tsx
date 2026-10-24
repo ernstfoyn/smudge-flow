@@ -6,6 +6,8 @@ import { BlockLibrary } from './ui/panels/BlockLibrary'
 import { Inspector } from './ui/panels/Inspector'
 import { Timeline } from './ui/panels/Timeline'
 import { ExportPanel } from './ui/panels/ExportPanel'
+import { ResizeHandle } from './ui/primitives/ResizeHandle'
+import { useElementSize, usePanelLayout } from './ui/usePanelLayout'
 import { useGraphStore } from './state/useGraphStore'
 import { usePlaybackStore } from './state/usePlaybackStore'
 import { serializeGraph, deserializeGraph } from './engine/graph'
@@ -29,6 +31,9 @@ export default function App() {
   const canRedo = useGraphStore((s) => s.canRedo)
   const undoLabel = useGraphStore((s) => s.undoLabel)
   const redoLabel = useGraphStore((s) => s.redoLabel)
+
+  const [workspaceRef, workspace] = useElementSize<HTMLDivElement>()
+  const { layout, limits, setPanel, resetPanel } = usePanelLayout(workspace)
 
   // Cmd/Ctrl+Z angrer, Cmd/Ctrl+Shift+Z gjør om.
   useEffect(() => {
@@ -151,9 +156,12 @@ export default function App() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1">
+      <div ref={workspaceRef} className="flex min-h-0 flex-1 overflow-hidden">
         {/* Venstre: palett + inspector */}
-        <aside className="flex w-64 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950">
+        <aside
+          className="flex min-w-0 shrink-0 flex-col bg-zinc-950"
+          style={{ width: layout.left }}
+        >
           <nav className="flex border-b border-zinc-800">
             {(
               [
@@ -166,7 +174,7 @@ export default function App() {
                 key={id}
                 type="button"
                 onClick={() => setLeftTab(id)}
-                className={`flex-1 px-3 py-2 text-[11px] font-medium transition ${
+                className={`min-w-0 flex-1 truncate px-2 py-2 text-[11px] font-medium transition ${
                   leftTab === id
                     ? 'border-b-2 border-lime-400 text-zinc-100'
                     : 'text-zinc-500 hover:text-zinc-300'
@@ -183,14 +191,38 @@ export default function App() {
           </div>
         </aside>
 
+        <ResizeHandle
+          orientation="vertical"
+          value={layout.left}
+          min={limits.left.min}
+          max={limits.left.max}
+          label="Juster venstre panel"
+          onChange={(value) => setPanel('left', value)}
+          onReset={() => resetPanel('left')}
+        />
+
         {/* Midten: graf + preview + timeline */}
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="relative min-h-0 flex-1 border-b border-zinc-800">
+          <div className="relative min-h-0 flex-1 overflow-hidden">
             <FlowCanvas />
           </div>
 
-          <section className="flex h-[46%] min-h-[280px] flex-col">
-            <nav className="flex items-center gap-1 border-b border-zinc-800 bg-zinc-900/40 px-3 py-1.5">
+          <ResizeHandle
+            orientation="horizontal"
+            value={layout.bottom}
+            min={limits.bottom.min}
+            max={limits.bottom.max}
+            invert
+            label="Juster bunnpanelet"
+            onChange={(value) => setPanel('bottom', value)}
+            onReset={() => resetPanel('bottom')}
+          />
+
+          <section
+            className="flex min-h-0 shrink-0 flex-col overflow-hidden"
+            style={{ height: layout.bottom }}
+          >
+            <nav className="flex shrink-0 items-center gap-1 border-b border-zinc-800 bg-zinc-900/40 px-3 py-1.5">
               {(
                 [
                   ['timeline', 'Timeline'],
@@ -218,11 +250,28 @@ export default function App() {
           </section>
         </main>
 
+        <ResizeHandle
+          orientation="vertical"
+          value={layout.right}
+          min={limits.right.min}
+          max={limits.right.max}
+          invert
+          label="Juster forhåndsvisningen"
+          onChange={(value) => setPanel('right', value)}
+          onReset={() => resetPanel('right')}
+        />
+
         {/* Høyre: preview */}
-        <aside className="flex w-[38%] min-w-[320px] shrink-0 flex-col border-l border-zinc-800 bg-zinc-950">
-          <div className="border-b border-zinc-800 bg-zinc-900/40 px-3 py-2">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+        <aside
+          className="flex min-w-0 shrink-0 flex-col bg-zinc-950"
+          style={{ width: layout.right }}
+        >
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-900/40 px-3 py-2">
+            <span className="truncate text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
               Forhåndsvisning
+            </span>
+            <span className="shrink-0 text-[9px] tabular-nums text-zinc-600">
+              {layout.right}px
             </span>
           </div>
           <div className="relative min-h-0 flex-1">

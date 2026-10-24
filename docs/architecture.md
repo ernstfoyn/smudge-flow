@@ -91,6 +91,14 @@ kildeporten. Sidepanelene er delt i sammenleggbare seksjoner, og nodepaletten
 har søk. Åpen/lukket-tilstand huskes i `localStorage` under
 `smudgeflow.ui.open.*`.
 
+Hovedpanelene kan justeres med skillestripene mellom venstre sidebar, grafen,
+bunnpanelet og forhåndsvisningen. Størrelsene lagres under
+`smudgeflow.ui.layout.v1`, og dobbeltklikk på en skillestripe gir
+standardstørrelsen tilbake. Både tastatur (piltaster, Home/End) og peker kan
+brukes. Grensene regnes ut fra vinduets faktiske størrelse, slik at grafen
+alltid beholder en minimumsflate og layouten aldri får horisontal overflow —
+også når en stor layout gjenåpnes i et smalere vindu.
+
 Et Houdini-inspirert hurtigsøk ligger på lerretet: **Tab** åpner en søkbar
 nodeliste ved musepekeren, piltastene velger, og **Enter** legger noden inn
 på samme sted. Tab stjeles ikke fra felt og andre redigerbare elementer.

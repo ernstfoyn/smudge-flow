@@ -6,6 +6,12 @@ interface BaseProps {
   disabled?: boolean
 }
 
+/** Felles etikettstil. `min-w-0` + truncate hindrer at lange navn skyver feltet ut. */
+const labelClass =
+  'w-20 min-w-0 shrink-0 truncate text-[11px] uppercase tracking-wide text-zinc-400'
+const stackedLabelClass =
+  'min-w-0 truncate text-[11px] uppercase tracking-wide text-zinc-400'
+
 export function NumberField({
   label,
   def,
@@ -15,8 +21,18 @@ export function NumberField({
 }: BaseProps & { def: ParamDef; value: number }) {
   const step = def.step ?? (def.type === 'int' ? 1 : 0.01)
   return (
-    <label className="flex items-center gap-2">
-      <span className="w-28 shrink-0 text-[11px] uppercase tracking-wide text-zinc-400">{label}</span>
+    <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_4rem] items-center gap-x-2 gap-y-1">
+      <span className={stackedLabelClass} title={label}>
+        {label}
+      </span>
+      <input
+        type="number"
+        value={Number.isFinite(value) ? value : 0}
+        step={step}
+        disabled={disabled}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full min-w-0 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-right text-[11px] tabular-nums text-zinc-100 outline-none focus:border-lime-500 disabled:opacity-40"
+      />
       <input
         type="range"
         min={def.min}
@@ -25,15 +41,7 @@ export function NumberField({
         value={Number.isFinite(value) ? value : Number(def.default ?? 0)}
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-1 flex-1 cursor-pointer appearance-none rounded bg-zinc-700 accent-lime-400 disabled:opacity-40"
-      />
-      <input
-        type="number"
-        value={Number.isFinite(value) ? value : 0}
-        step={step}
-        disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-16 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-right text-[11px] tabular-nums text-zinc-100 outline-none focus:border-lime-500 disabled:opacity-40"
+        className="col-span-2 h-1 w-full min-w-0 cursor-pointer appearance-none rounded bg-zinc-700 accent-lime-400 disabled:opacity-40"
       />
     </label>
   )
@@ -46,16 +54,18 @@ export function ColorField({
   disabled,
 }: BaseProps & { value: string }) {
   return (
-    <label className="flex items-center gap-2">
-      <span className="w-28 shrink-0 text-[11px] uppercase tracking-wide text-zinc-400">{label}</span>
+    <label className="flex min-w-0 items-center gap-2">
+      <span className={labelClass} title={label}>
+        {label}
+      </span>
       <input
         type="color"
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="h-7 w-10 cursor-pointer rounded border border-zinc-700 bg-transparent disabled:opacity-40"
+        className="h-7 w-10 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent disabled:opacity-40"
       />
-      <span className="text-[11px] tabular-nums text-zinc-400">{value}</span>
+      <span className="min-w-0 truncate text-[11px] tabular-nums text-zinc-400">{value}</span>
     </label>
   )
 }
@@ -68,8 +78,10 @@ export function SelectField({
   disabled,
 }: BaseProps & { def: ParamDef; value: string | number }) {
   return (
-    <label className="flex items-center gap-2">
-      <span className="w-28 shrink-0 text-[11px] uppercase tracking-wide text-zinc-400">{label}</span>
+    <label className="flex min-w-0 items-center gap-2">
+      <span className={labelClass} title={label}>
+        {label}
+      </span>
       <select
         value={String(value ?? def.default ?? '')}
         disabled={disabled}
@@ -78,7 +90,7 @@ export function SelectField({
           const match = def.options?.find((o) => String(o.value) === raw)
           onChange(match ? match.value : raw)
         }}
-        className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100 outline-none focus:border-lime-500 disabled:opacity-40"
+        className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100 outline-none focus:border-lime-500 disabled:opacity-40"
       >
         {def.options?.map((o) => (
           <option key={String(o.value)} value={String(o.value)}>
@@ -97,14 +109,16 @@ export function CheckField({
   disabled,
 }: BaseProps & { value: boolean }) {
   return (
-    <label className="flex items-center gap-2">
-      <span className="w-28 shrink-0 text-[11px] uppercase tracking-wide text-zinc-400">{label}</span>
+    <label className="flex min-w-0 items-center gap-2">
+      <span className={labelClass} title={label}>
+        {label}
+      </span>
       <input
         type="checkbox"
         checked={!!value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 accent-lime-400 disabled:opacity-40"
+        className="h-4 w-4 shrink-0 accent-lime-400 disabled:opacity-40"
       />
     </label>
   )
@@ -117,15 +131,17 @@ export function TextField({
   disabled,
 }: BaseProps & { value: string }) {
   return (
-    <label className="flex items-center gap-2">
-      <span className="w-28 shrink-0 text-[11px] uppercase tracking-wide text-zinc-400">{label}</span>
+    <label className="flex min-w-0 items-center gap-2">
+      <span className={labelClass} title={label}>
+        {label}
+      </span>
       <input
         type="text"
         value={value ?? ''}
         disabled={disabled}
         placeholder="https:// … eller last opp en fil"
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100 outline-none focus:border-lime-500 disabled:opacity-40"
+        className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100 outline-none focus:border-lime-500 disabled:opacity-40"
       />
     </label>
   )
@@ -138,8 +154,10 @@ export function CodeField({
   disabled,
 }: BaseProps & { value: string }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-[11px] uppercase tracking-wide text-zinc-400">{label}</span>
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className="min-w-0 truncate text-[11px] uppercase tracking-wide text-zinc-400" title={label}>
+        {label}
+      </span>
       <textarea
         value={value ?? ''}
         disabled={disabled}
@@ -147,7 +165,7 @@ export function CodeField({
         wrap="off"
         rows={7}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full resize-y rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] leading-relaxed text-zinc-100 outline-none focus:border-lime-500 disabled:opacity-40"
+        className="w-full min-w-0 resize-y rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] leading-relaxed text-zinc-100 outline-none focus:border-lime-500 disabled:opacity-40"
       />
     </label>
   )

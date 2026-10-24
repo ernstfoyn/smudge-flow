@@ -115,7 +115,7 @@ export function Viewport() {
   const aspect = graph.settings.width / graph.settings.height
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-black/40 p-3">
+    <div className="flex h-full min-w-0 w-full items-center justify-center bg-black/40 p-3">
       <div
         className="relative overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl"
         style={{ aspectRatio: `${aspect}`, maxHeight: '100%', width: aspect >= 1 ? '100%' : 'auto', maxWidth: '100%' }}
@@ -124,7 +124,7 @@ export function Viewport() {
       </div>
 
       {error && (
-        <div className="absolute inset-x-4 top-16 rounded-lg border border-red-500/40 bg-red-950/80 p-3 text-[12px] leading-relaxed text-red-200 backdrop-blur">
+        <div className="absolute inset-x-4 top-4 max-h-[calc(100%-2rem)] overflow-y-auto rounded-lg border border-red-500/40 bg-red-950/80 p-3 text-[12px] leading-relaxed text-red-200 backdrop-blur">
           <strong className="mb-1 block text-[11px] uppercase tracking-widest text-red-300">
             Graffen kan ikke evalueres
           </strong>
@@ -135,14 +135,14 @@ export function Viewport() {
         </div>
       )}
 
-      <div className="pointer-events-none absolute left-4 top-4 flex gap-2 text-[10px]">
+      <div className="pointer-events-none absolute left-4 top-4 flex max-w-[calc(100%-2rem)] flex-wrap gap-2 text-[10px]">
         <span className="rounded bg-black/60 px-2 py-1 tabular-nums text-lime-300">
           frame {frame}
         </span>
         <span className="rounded bg-black/60 px-2 py-1 tabular-nums text-zinc-400">
           {graph.settings.width}×{graph.settings.height} @ {graph.settings.fps}fps
         </span>
-        <span className="rounded bg-black/60 px-2 py-1 tabular-nums text-zinc-500">
+        <span className="hidden rounded bg-black/60 px-2 py-1 tabular-nums text-zinc-500 sm:inline">
           {registry.all().length} nodetyper
         </span>
       </div>
