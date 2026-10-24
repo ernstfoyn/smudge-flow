@@ -136,7 +136,7 @@ export function Timeline() {
                   title={`Frame ${f} — klikk for å hoppe, dobbeltklikk for å slette`}
                   onClick={() => seek(f)}
                   onDoubleClick={() => removeKeyframe(track.nodeId, track.path, f)}
-                  className="absolute top-0.5 h-3 w-1.5 -translate-x-1/2 rounded-sm bg-amber-400 hover:bg-amber-300"
+                  className="absolute top-0.5 h-3 w-1.5 -translate-x-1/2 rounded-sm bg-amber-400 hover:bg-amber-500"
                   style={{ left: `${(f / Math.max(1, frames - 1)) * 100}%` }}
                 />
               ))}

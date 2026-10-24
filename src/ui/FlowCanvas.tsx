@@ -14,6 +14,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useGraphStore } from '../state/useGraphStore'
+import { useThemeStore } from '../state/useThemeStore'
 import { useConnectionDrag } from '../state/useConnectionDrag'
 import {
   PARAM_PORT_PREFIX,
@@ -48,6 +49,7 @@ function isTextEntryTarget(target: EventTarget | null): boolean {
 
 function FlowInner() {
   const graph = useGraphStore((s) => s.graph)
+  const theme = useThemeStore((s) => s.theme)
   const selection = useGraphStore((s) => s.selection)
   const selectedEdges = useGraphStore((s) => s.selectedEdges)
   const moveNode = useGraphStore((s) => s.moveNode)
@@ -404,6 +406,7 @@ function FlowInner() {
         onConnectEnd={onConnectEnd}
         isValidConnection={isValidConnection}
         connectionLineStyle={connectionLineStyle}
+        colorMode={theme}
         deleteKeyCode={null}
         multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
         fitView
@@ -411,14 +414,14 @@ function FlowInner() {
         minZoom={0.2}
         maxZoom={2}
       >
-        <Background color="#27272a" gap={22} size={1} />
+        <Background color={theme === 'dark' ? '#27272a' : '#d4d4d8'} gap={22} size={1} />
         <Controls className="!border-zinc-700 !bg-zinc-900 !fill-zinc-400" />
         <MiniMap
           pannable
           zoomable
           className="!border-zinc-700 !bg-zinc-900"
           style={{ width: 170, height: 120 }}
-          maskColor="rgba(9, 9, 11, 0.72)"
+          maskColor={theme === 'dark' ? 'rgba(9, 9, 11, 0.72)' : 'rgba(250, 250, 250, 0.72)'}
           nodeColor={() => '#4d7c0f'}
           nodeStrokeColor="#a3e635"
           nodeBorderRadius={3}

@@ -208,6 +208,17 @@ følger filformatet den nodens innstilling; ellers brukes prosjektinnstillingen.
 
 ---
 
+## Tema
+
+Mørkt tema er standard. Knappen med sol/måne øverst til høyre bytter til lyst
+tema, og valget huskes i nettleseren (`localStorage`, nøkkel `smudgeflow.theme`).
+
+Fargene styres av variabler i `src/styles/index.css`. Lyst tema overstyrer
+zinc-skalaen og de få accentfargene som brukes til tekst. Solide flater, som
+lime-knappene, beholder sine farger.
+
+---
+
 ## Angre og gjøre om
 
 Alt som endrer grafen, registreres i historikken: noder, koblinger,

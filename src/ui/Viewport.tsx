@@ -124,7 +124,7 @@ export function Viewport() {
   const aspect = graph.settings.width / graph.settings.height
 
   return (
-    <div className="flex h-full min-w-0 w-full items-center justify-center bg-black/40 p-3">
+    <div className="flex h-full min-w-0 w-full items-center justify-center bg-[var(--stage-bg)] p-3">
       <div
         className="relative overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl"
         style={{ aspectRatio: `${aspect}`, maxHeight: '100%', width: aspect >= 1 ? '100%' : 'auto', maxWidth: '100%' }}
@@ -145,13 +145,13 @@ export function Viewport() {
       )}
 
       <div className="pointer-events-none absolute left-4 top-4 flex max-w-[calc(100%-2rem)] flex-wrap gap-2 text-[10px]">
-        <span className="rounded bg-black/60 px-2 py-1 tabular-nums text-lime-300">
+        <span className="rounded bg-[var(--stage-badge)] px-2 py-1 tabular-nums text-lime-300">
           frame {frame}
         </span>
-        <span className="rounded bg-black/60 px-2 py-1 tabular-nums text-zinc-400">
+        <span className="rounded bg-[var(--stage-badge)] px-2 py-1 tabular-nums text-zinc-400">
           {graph.settings.width}×{graph.settings.height} @ {graph.settings.fps}fps
         </span>
-        <span className="hidden rounded bg-black/60 px-2 py-1 tabular-nums text-zinc-500 sm:inline">
+        <span className="hidden rounded bg-[var(--stage-badge)] px-2 py-1 tabular-nums text-zinc-500 sm:inline">
           {registry.all().length} nodetyper
         </span>
       </div>

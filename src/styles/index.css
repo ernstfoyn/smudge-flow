@@ -5,6 +5,63 @@
   --color-zinc-900: #101014;
 }
 
+/* Mørkt tema er standard. Variablene under er det som styrer utseendet. */
+:root {
+  --controls-bg: #18181b;
+  --controls-border: #3f3f46;
+  --controls-fill: #a1a1aa;
+  --controls-hover: #27272a;
+  --scrollbar: #3f3f46;
+  --stage-bg: rgba(0, 0, 0, 0.4);
+  --stage-badge: rgba(0, 0, 0, 0.6);
+}
+
+/*
+ * Lyst tema. Hele appen bruker zinc-klassene direkte, så det er nok å bytte
+ * fargene bak dem. Accentfarger brukt som tekst mørkes, slik at de er lesbare
+ * på lys bakgrunn. Solide flater (knapper, porter) beholder sine farger.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-zinc-950: #fafafa;
+  --color-zinc-900: #ffffff;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-700: #d4d4d8;
+  --color-zinc-600: #8b8b95;
+  --color-zinc-500: #71717a;
+  --color-zinc-400: #52525b;
+  --color-zinc-300: #3f3f46;
+  --color-zinc-200: #27272a;
+  --color-zinc-100: #18181b;
+
+  --color-lime-100: #365314;
+  --color-lime-200: #3f6212;
+  --color-lime-300: #4d7c0f;
+  --color-sky-200: #075985;
+  --color-sky-300: #0369a1;
+  --color-red-200: #991b1b;
+  --color-red-300: #b91c1c;
+  --color-red-400: #dc2626;
+  --color-red-900: #fecaca;
+  --color-red-950: #fef2f2;
+  --color-amber-200: #92400e;
+  --color-amber-300: #b45309;
+  --color-violet-100: #4c1d95;
+  --color-violet-300: #6d28d9;
+  --color-blue-300: #1d4ed8;
+  --color-cyan-300: #0e7490;
+  --color-fuchsia-300: #a21caf;
+
+  --controls-bg: #ffffff;
+  --controls-border: #d4d4d8;
+  --controls-fill: #52525b;
+  --controls-hover: #f4f4f5;
+  --scrollbar: #d4d4d8;
+  --stage-bg: #e4e4e7;
+  --stage-badge: rgba(255, 255, 255, 0.85);
+}
+
 html,
 body,
 #root {
@@ -13,8 +70,8 @@ body,
 
 body {
   margin: 0;
-  background: #09090b;
-  color: #e4e4e7;
+  background: var(--color-zinc-950);
+  color: var(--color-zinc-200);
   font-family:
     ui-sans-serif,
     system-ui,
@@ -55,7 +112,7 @@ body {
 
 .react-flow__handle.smudge-port--multi {
   box-shadow:
-    0 0 0 2px #09090b,
+    0 0 0 2px var(--color-zinc-950),
     0 0 0 4px color-mix(in srgb, var(--port-color, #a3e635) 30%, transparent);
 }
 
@@ -110,13 +167,13 @@ body {
 }
 
 .react-flow__controls-button {
-  background: #18181b;
-  border-bottom: 1px solid #3f3f46;
-  fill: #a1a1aa;
+  background: var(--controls-bg);
+  border-bottom: 1px solid var(--controls-border);
+  fill: var(--controls-fill);
 }
 
 .react-flow__controls-button:hover {
-  background: #27272a;
+  background: var(--controls-hover);
 }
 
 .react-flow__controls-button svg {
@@ -126,7 +183,7 @@ body {
 /* Scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3f3f46 transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -135,7 +192,7 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: var(--scrollbar);
   border-radius: 999px;
 }
 

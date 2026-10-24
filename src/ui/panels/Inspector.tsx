@@ -459,7 +459,7 @@ export function Inspector() {
           <button
             type="button"
             onClick={() => instantiate(node.id)}
-            className="rounded-lg bg-lime-400 px-3 py-1.5 text-[11px] font-semibold text-zinc-950 hover:bg-lime-300"
+            className="rounded-lg bg-lime-400 px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-lime-500"
           >
             ⧉ Lag kopi
           </button>

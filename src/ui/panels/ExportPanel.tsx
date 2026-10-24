@@ -248,7 +248,7 @@ export function ExportPanel() {
           type="button"
           onClick={run}
           disabled={status.kind === 'running'}
-          className="flex-1 rounded-lg bg-lime-400 px-3 py-2 text-[12px] font-semibold text-zinc-950 transition hover:bg-lime-300 disabled:opacity-50"
+          className="flex-1 rounded-lg bg-lime-400 px-3 py-2 text-[12px] font-semibold text-black transition hover:bg-lime-500 disabled:opacity-50"
         >
           ↓ Eksporter video
         </button>

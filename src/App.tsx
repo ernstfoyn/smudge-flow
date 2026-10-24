@@ -9,6 +9,7 @@ import { ExportPanel } from './ui/panels/ExportPanel'
 import { ResizeHandle } from './ui/primitives/ResizeHandle'
 import { useElementSize, usePanelLayout } from './ui/usePanelLayout'
 import { useGraphStore } from './state/useGraphStore'
+import { useThemeStore } from './state/useThemeStore'
 import { usePlaybackStore } from './state/usePlaybackStore'
 import { serializeGraph, deserializeGraph } from './engine/graph'
 
@@ -140,6 +141,7 @@ export default function App() {
           >
             Nullstill
           </button>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -280,5 +282,22 @@ export default function App() {
         </aside>
       </div>
     </div>
+  )
+}
+
+function ThemeToggle() {
+  const theme = useThemeStore((s) => s.theme)
+  const toggle = useThemeStore((s) => s.toggle)
+  const next = theme === 'dark' ? 'lyst' : 'mørkt'
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      title={`Bytt til ${next} tema`}
+      aria-label={`Bytt til ${next} tema`}
+      className="rounded border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-[12px] text-zinc-400 hover:bg-zinc-800"
+    >
+      {theme === 'dark' ? '☀' : '☾'}
+    </button>
   )
 }
