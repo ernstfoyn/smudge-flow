@@ -12,6 +12,52 @@ import {
   type OutputFormat,
 } from '../../export/outputFormat'
 
+/**
+ * Tallfelt for bredde/høyde. Brukeren kan skrive fritt; verdien klemmes og
+ * lagres først ved Enter eller når feltet forlates. Escape angrer.
+ */
+function SizeInput({
+  value,
+  draft,
+  onDraft,
+  onCommit,
+}: {
+  value: number
+  draft: string
+  onDraft: (text: string) => void
+  onCommit: (text: string) => void
+}) {
+  const cancelled = useRef(false)
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={draft === '' ? String(value) : draft}
+      onFocus={(e) => {
+        cancelled.current = false
+        e.currentTarget.select()
+      }}
+      onChange={(e) => onDraft(e.target.value.replace(/[^0-9]/g, ''))}
+      onBlur={(e) => {
+        if (cancelled.current) {
+          cancelled.current = false
+          onDraft('')
+          return
+        }
+        onCommit(e.currentTarget.value)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        if (e.key === 'Escape') {
+          cancelled.current = true
+          e.currentTarget.blur()
+        }
+      }}
+      className="w-20 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-right tabular-nums text-zinc-100"
+    />
+  )
+}
+
 interface Status {
   kind: 'idle' | 'running' | 'done' | 'error'
   message: string
@@ -27,6 +73,11 @@ export function ExportPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const [status, setStatus] = useState<Status>({ kind: 'idle', message: 'Klar', progress: 0 })
+  /** Skriveutkast for bredde/høyde: klemmes først når brukeren er ferdig. */
+  const [sizeDraft, setSizeDraft] = useState<{ width: string; height: string }>({
+    width: '',
+    height: '',
+  })
 
   const exportNode = graph.nodes.find((n) => n.type === 'output.export')
   const target = exportNode ?? graph.nodes.find((n) => n.type === 'output.viewport')
@@ -139,35 +190,27 @@ export function ExportPanel() {
 
         <label className="flex min-w-0 items-center gap-2">
           <span className="w-20 shrink-0 text-[11px] text-zinc-400">Bredde</span>
-          <input
-            type="number"
-            min={64}
-            max={4096}
-            step={2}
+          <SizeInput
             value={graph.settings.width}
-            onChange={(e) => {
-              setSettings({
-                width: clampOutputSize(Number(e.target.value), graph.settings.width),
-              })
+            draft={sizeDraft.width}
+            onDraft={(text) => setSizeDraft((d) => ({ ...d, width: text }))}
+            onCommit={(text) => {
+              setSettings({ width: clampOutputSize(Number(text), graph.settings.width) })
+              setSizeDraft((d) => ({ ...d, width: '' }))
             }}
-            className="w-20 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-right tabular-nums text-zinc-100"
           />
         </label>
 
         <label className="flex min-w-0 items-center gap-2">
           <span className="w-20 shrink-0 text-[11px] text-zinc-400">Høyde</span>
-          <input
-            type="number"
-            min={64}
-            max={4096}
-            step={2}
+          <SizeInput
             value={graph.settings.height}
-            onChange={(e) => {
-              setSettings({
-                height: clampOutputSize(Number(e.target.value), graph.settings.height),
-              })
+            draft={sizeDraft.height}
+            onDraft={(text) => setSizeDraft((d) => ({ ...d, height: text }))}
+            onCommit={(text) => {
+              setSettings({ height: clampOutputSize(Number(text), graph.settings.height) })
+              setSizeDraft((d) => ({ ...d, height: '' }))
             }}
-            className="w-20 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-right tabular-nums text-zinc-100"
           />
         </label>
 
