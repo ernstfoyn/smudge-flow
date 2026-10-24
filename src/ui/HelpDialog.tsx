@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { HELP_TOPICS, findTopic, type HelpBlock } from '../help/content'
+import { findExample } from '../help/examples'
 import { useHelpStore } from '../state/useHelpStore'
+import { useGraphStore } from '../state/useGraphStore'
 
 export function HelpDialog() {
   const open = useHelpStore((s) => s.open)
@@ -141,6 +143,8 @@ function Block({ block }: { block: HelpBlock }) {
           ))}
         </dl>
       )
+    case 'example':
+      return <ExampleCard id={block.id} />
     case 'tip':
       return (
         <p className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[12px] text-sky-200">
@@ -148,4 +152,39 @@ function Block({ block }: { block: HelpBlock }) {
         </p>
       )
   }
+}
+
+function ExampleCard({ id }: { id: string }) {
+  const example = findExample(id)
+  if (!example) return null
+
+  const load = () => {
+    const { graph, select, setGraph } = useGraphStore.getState()
+    if (graph.nodes.length && !window.confirm(`Eksemplet «${example.title}» erstatter grafen du har nå. Fortsette?`)) {
+      return
+    }
+    select(null)
+    setGraph(example.build())
+    useGraphStore.setState({ notice: `Eksempel lastet: «${example.title}». Trykk Angre for å gå tilbake.` })
+    useHelpStore.getState().close()
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-lime-500/30 bg-lime-500/5 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-lime-700">Eksempel</p>
+          <p className="text-[13px] font-semibold text-zinc-100">{example.title}</p>
+        </div>
+        <button
+          type="button"
+          onClick={load}
+          className="shrink-0 rounded-md bg-lime-400 px-3 py-1.5 text-[12px] font-semibold text-black hover:bg-lime-500"
+        >
+          Prøv i grafen
+        </button>
+      </div>
+      <p className="text-[12px] leading-relaxed text-zinc-400">{example.description}</p>
+    </div>
+  )
 }

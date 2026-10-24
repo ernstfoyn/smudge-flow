@@ -9,6 +9,8 @@ export type HelpBlock =
   | { type: 'steps'; items: string[] }
   | { type: 'keys'; items: Array<{ keys: string; does: string }> }
   | { type: 'tip'; text: string }
+  /** Et eksempel som kan lastes inn i grafen (id i HELP_EXAMPLES). */
+  | { type: 'example'; id: string }
 
 export interface HelpTopic {
   id: string
@@ -42,6 +44,7 @@ export const HELP_TOPICS: HelpTopic[] = [
         type: 'tip',
         text: 'Gjør du en feil, trykk Cmd/Ctrl + Z for å angre. Du kan angre nesten alt, også koblinger og parameterendringer.',
       },
+      { type: 'example', id: 'startgraf' },
     ],
   },
   {
@@ -107,6 +110,7 @@ export const HELP_TOPICS: HelpTopic[] = [
         type: 'tip',
         text: 'Fargene forteller deg hva som kan kobles: Bilde (grønn), 3D-objekt (oransje), Tall (blå), Kamera (lilla) og Lys (gul). Samme farge betyr at porten passer.',
       },
+      { type: 'example', id: 'lagstabel' },
     ],
   },
   {
@@ -137,6 +141,7 @@ export const HELP_TOPICS: HelpTopic[] = [
           'Form «Tegnet kurve» lar deg tegne selv. Klikk i feltet for å legge til et punkt, dra for å flytte det, dobbeltklikk for å fjerne det.',
         ],
       },
+      { type: 'example', id: 'signal-styring' },
     ],
   },
   {
@@ -158,6 +163,7 @@ export const HELP_TOPICS: HelpTopic[] = [
         type: 'tip',
         text: 'Bruk heller et signal enn mange keyframes for det som skal gå rundt i loopen. Keyframes er bedre for hendelser som skjer én gang, for eksempel at noe vokser fram.',
       },
+      { type: 'example', id: 'keyframes' },
     ],
   },
   {
@@ -182,6 +188,8 @@ export const HELP_TOPICS: HelpTopic[] = [
         type: 'tip',
         text: 'Viewporten kan bli tregere med 3D-scener. Den viser da alltid det siste ferdige bildet, og oppdateres så snart neste er klart.',
       },
+      { type: 'example', id: '3d-scene' },
+      { type: 'example', id: 'blob' },
     ],
   },
   {

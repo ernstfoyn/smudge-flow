@@ -225,6 +225,10 @@ Hjelpen åpnes første gang du starter appen, og senere med **?**-knappen i
 topplinjen eller tasten `?`. Den dekker komme-i-gang, begreper, arbeidsflaten,
 signaler og styring, animasjon, 3D, eksport, snarveier og feilsøking.
 
+Hjelpen inneholder eksempler som du kan laste inn i grafen med **Prøv i
+grafen**, og Angre går tilbake til det du hadde. Eksemplene ligger i
+`src/help/examples.ts` og valideres i `tests/examples.test.ts`.
+
 Innholdet ligger i `src/help/content.ts`. Lenker som **Hva er dette?** i
 Egenskaper og Eksport-panelet åpner riktig kapittel direkte.
 
