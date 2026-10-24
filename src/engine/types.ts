@@ -160,6 +160,8 @@ export interface GraphNode {
   group?: Subgraph
   /** Nodekortet vises sammenklappet. */
   collapsed?: boolean
+  /** Parameternøkler som styres av «Styring»-inngangen (kind: 'drive'). */
+  drives?: string[]
 }
 
 export interface GraphEdge {
@@ -172,8 +174,10 @@ export interface GraphEdge {
    * 'value' = vanlig dataflyt.
    * 'param'  = verdien fra kilden driver en parameter i målnoden
    *            (targetParam peker på parameterens nøkkel).
+   * 'drive'  = verdien fra kilden driver alle parameterne som er valgt i
+   *            målnodens `drives`-liste (én kobling til hele noden).
    */
-  kind?: 'value' | 'param'
+  kind?: 'value' | 'param' | 'drive'
   targetParam?: string
 }
 

@@ -60,7 +60,7 @@ export function createEdge(
   sourcePort: string,
   target: NodeId,
   targetPort: string,
-  kind: 'value' | 'param' = 'value',
+  kind: 'value' | 'param' | 'drive' = 'value',
 ): GraphEdge {
   return {
     id: `${source}.${sourcePort}->${target}.${targetPort}`,

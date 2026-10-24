@@ -55,7 +55,7 @@ export function PortLegend() {
               className="inline-block h-2 w-2 shrink-0 rotate-45 rounded-[1px]"
               style={{ background: PARAM_META.color }}
             />
-            Diamant = parameter (styres av Tall)
+            Diamant = én parameter · «Styring» = flere
           </p>
         </div>
       )}

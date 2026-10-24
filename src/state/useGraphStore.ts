@@ -12,6 +12,7 @@ import {
   rekeySubgraph,
 } from '../engine/graph'
 import { wouldCreateCycle } from '../engine/topoSort'
+import { DRIVE_PORT_ID, drivableParams } from '../engine/drive'
 import { upsertKey } from '../engine/animation/keyframes'
 import { registry } from '../nodes'
 import { blockFromSelection } from '../blocks/builder'
@@ -86,6 +87,8 @@ interface GraphState {
   setLfo: (id: NodeId, path: string, patch: Partial<LfoConfig>) => void
 
   setSettings: (patch: Partial<GraphSettings>) => void
+  /** Velger hvilke parametere «Styring»-inngangen på noden styrer. */
+  setDrives: (id: NodeId, keys: string[]) => void
   /** Tar ett steg tilbake i endringene. */
   undo: () => void
   /** Tar ett steg fram i endringene. */
@@ -181,6 +184,9 @@ function describeChange(
         (k) => JSON.stringify(before.params[k]) !== JSON.stringify(node.params[k]),
       )
       return { label: 'Endret parameter', key: `param:${id}:${key}` }
+    }
+    if (JSON.stringify(before.drives) !== JSON.stringify(node.drives)) {
+      return { label: 'Endret styring', key: `drives:${id}` }
     }
     if (JSON.stringify(before.tracks) !== JSON.stringify(node.tracks)) {
       return { label: 'Endret keyframes', key: `tracks:${id}` }
@@ -279,6 +285,36 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
     const outPort = findPort(sourcePorts.outputs, sourcePort)
     if (!outPort) return false
+
+    // --- Styring: én kobling til hele noden --------------------------------
+    if (targetPort === DRIVE_PORT_ID) {
+      if (outPort.type !== 'number') {
+        set({ notice: 'Styring tar bare imot tall.' })
+        return false
+      }
+      if (!drivableParams(nodeParamDefs(targetNode)).length) {
+        set({ notice: `«${targetNode.title}» har ingen parametere som kan styres.` })
+        return false
+      }
+
+      const id = `${source}.${sourcePort}->${target}.${targetPort}`
+      set({
+        graph: {
+          ...graph,
+          // Én styring per node: en ny kobling erstatter den gamle.
+          edges: [
+            ...graph.edges.filter((e) => !(e.kind === 'drive' && e.target === target)),
+            { id, source, sourcePort, target, targetPort, kind: 'drive' },
+          ],
+          nodes: graph.nodes.map((n) =>
+            n.id === target && !n.drives ? { ...n, drives: [] } : n,
+          ),
+        },
+        selected: target,
+        notice: `«${sourceNode.title}» styrer «${targetNode.title}». Velg parametere under Styring i Egenskaper.`,
+      })
+      return true
+    }
 
     // --- Parameter-kobling: verdien driver en parameter --------------------
     if (targetPort.startsWith(PARAM_PORT_PREFIX)) {
@@ -812,6 +848,14 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   setSettings: (patch) =>
     set((s) => ({ graph: { ...s.graph, settings: { ...s.graph.settings, ...patch } } })),
+
+  setDrives: (id, keys) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) => (n.id === id ? { ...n, drives: [...keys] } : n)),
+      },
+    })),
 
   /**
    * Tar ett steg tilbake i endringene.

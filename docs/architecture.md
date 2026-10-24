@@ -254,6 +254,23 @@ spiral/sverm og faseforskyvningen per kopi, som i den gamle cloneren.
 Standardblokkene «Bevegelig bilde» og «3D-animasjon» er ferdige kjeder som viser
 begge nodene med et fornuftig utgangspunkt.
 
+### Styring: én kobling til hele noden
+
+Hver node med tallparametere har en **Styring**-inngang på venstre side av
+kortet. Dra «Verdi» fra en kurve dit, så åpner Egenskaper en liste der du
+huker av hvilke parametere kurven skal styre (**Alle** / **Ingen** finnes også).
+
+- Kanten har `kind: 'drive'` og peker på porten `drive:all`.
+- Valget lagres på målnoden i `node.drives` (liste med parameternøkler).
+- Verdien settes rett inn i hver valgt parameter og begrenses til
+  parameterens `min`/`max` (heltall rundes). Sett Min og Max på kurven slik at
+  området passer.
+- En enkeltkobling til en diamant overstyrer styringen for den ene parameteren.
+- Én styring per node: en ny kobling erstatter den gamle.
+
+Diamantene (én parameter) ligger på venstre side, sammen med alle andre
+innganger. Utganger ligger alltid til høyre.
+
 ### Parameter-koblinger
 
 En node kan styre en parameter i en annen node. I UI-et: dra fra en

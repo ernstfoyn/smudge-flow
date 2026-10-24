@@ -21,6 +21,7 @@ import {
   nodeParamDefs,
   nodePorts,
 } from '../engine/graph'
+import { DRIVE_PORT_ID, drivableParams } from '../engine/drive'
 import { NodeCard } from './nodes/NodeCard'
 import { NodeTabMenu } from './NodeTabMenu'
 import { PortLegend } from './PortLegend'
@@ -87,7 +88,9 @@ function FlowInner() {
     return graph.edges.map((edge) => {
       let stroke = '#a3e635'
 
-      if (edge.kind === 'param') {
+      const dashed = edge.kind === 'param' || edge.kind === 'drive'
+
+      if (dashed) {
         stroke = PARAM_META.color
       } else {
         const source = byId.get(edge.source)
@@ -106,11 +109,11 @@ function FlowInner() {
         target: edge.target,
         targetHandle: edge.targetPort,
         selected: isSelected,
-        animated: edge.kind === 'param',
+        animated: dashed,
         style: {
           stroke,
-          strokeWidth: isSelected ? 3 : edge.kind === 'param' ? 1.6 : 1.8,
-          strokeDasharray: edge.kind === 'param' ? '4 3' : undefined,
+          strokeWidth: isSelected ? 3 : edge.kind === 'drive' ? 2.4 : dashed ? 1.6 : 1.8,
+          strokeDasharray: dashed ? '4 3' : undefined,
           filter: isSelected ? `drop-shadow(0 0 3px ${stroke})` : undefined,
         },
       }
@@ -186,6 +189,17 @@ function FlowInner() {
         return
       }
 
+      if (params.handleId === DRIVE_PORT_ID) {
+        startDrag({
+          nodeId: node.id,
+          portId: params.handleId,
+          direction: 'target',
+          type: 'number',
+          isParam: true,
+        })
+        return
+      }
+
       if (params.handleId.startsWith(PARAM_PORT_PREFIX)) {
         const key = params.handleId.slice(PARAM_PORT_PREFIX.length)
         const param = nodeParamDefs(node).find((p) => p.key === key)
@@ -233,6 +247,9 @@ function FlowInner() {
     if (!sourcePort) return false
 
     const targetHandle = connection.targetHandle ?? 'in'
+    if (targetHandle === DRIVE_PORT_ID) {
+      return sourcePort.type === 'number' && drivableParams(nodeParamDefs(targetNode)).length > 0
+    }
     if (targetHandle.startsWith(PARAM_PORT_PREFIX)) {
       const key = targetHandle.slice(PARAM_PORT_PREFIX.length)
       const param = nodeParamDefs(targetNode).find((p) => p.key === key)

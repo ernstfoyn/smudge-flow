@@ -4,6 +4,7 @@ import { registry } from '../../nodes'
 import { useGraphStore } from '../../state/useGraphStore'
 import { useConnectionDrag } from '../../state/useConnectionDrag'
 import { PARAM_PORT_PREFIX, nodeParamDefs, nodePorts } from '../../engine/graph'
+import { DRIVE_PORT_ID, drivableParams } from '../../engine/drive'
 import type { PortDef } from '../../engine/types'
 import { PARAM_META, paramPortCompatible, portMeta, valuePortsCompatible } from '../portStyle'
 
@@ -78,12 +79,12 @@ function PortDot({
   )
 }
 
-/** Parameterinnganger er tall, men tegnes som en diamant på kortets høyre kant. */
+/** Parameterinnganger er tall, men tegnes som en diamant på kortets venstre kant. */
 function ParamHandle({ id, state, label }: { id: string; state: PortState; label: string }) {
   const style: CSSProperties & { '--port-color': string } = {
     width: 10,
     height: 10,
-    right: -12,
+    left: -12,
     background: PARAM_META.color,
     border: '2px solid #09090b',
     '--port-color': PARAM_META.color,
@@ -92,7 +93,7 @@ function ParamHandle({ id, state, label }: { id: string; state: PortState; label
   return (
     <Handle
       type="target"
-      position={Position.Right}
+      position={Position.Left}
       id={id}
       title={`${PARAM_META.label} — ${PARAM_META.hint}`}
       aria-label={`${PARAM_META.label}: ${label}`}
@@ -131,9 +132,11 @@ export function NodeCard({ id, selected }: NodeProps) {
     (port) => !port.optional && !edges.some((e) => e.target === id && e.targetPort === port.id),
   )
 
-  const drivable = paramDefs.filter(
-    (p) => (p.type === 'number' || p.type === 'int') && p.animatable !== false,
-  )
+  const drivable = drivableParams(paramDefs)
+  const driveEdge = edges.find((e) => e.kind === 'drive' && e.target === id)
+  const driveCount = (node.drives ?? []).filter((key) =>
+    drivable.some((p) => p.key === key),
+  ).length
   const isDriven = (key: string) =>
     edges.some((e) => e.kind === 'param' && e.target === id && e.targetParam === key)
   // Koblede parametere vises alltid, ellers mister kanten håndtaket sitt.
@@ -165,6 +168,15 @@ export function NodeCard({ id, selected }: NodeProps) {
     const handleId = `${PARAM_PORT_PREFIX}${key}`
     if (drag.nodeId === id) {
       return drag.direction === 'target' && drag.portId === handleId ? 'origin' : 'muted'
+    }
+    if (drag.direction !== 'source') return 'muted'
+    return paramPortCompatible(drag.type) ? 'compatible' : 'incompatible'
+  }
+
+  const driveState = (): PortState => {
+    if (!drag) return 'idle'
+    if (drag.nodeId === id) {
+      return drag.direction === 'target' && drag.portId === DRIVE_PORT_ID ? 'origin' : 'muted'
     }
     if (drag.direction !== 'source') return 'muted'
     return paramPortCompatible(drag.type) ? 'compatible' : 'incompatible'
@@ -219,7 +231,7 @@ export function NodeCard({ id, selected }: NodeProps) {
         </span>
       </header>
 
-      {(ports.inputs.length > 0 || ports.outputs.length > 0) && (
+      {(ports.inputs.length > 0 || ports.outputs.length > 0 || drivable.length > 0) && (
         <div className="flex flex-col gap-0.5 px-3 py-2">
           {ports.inputs.map((port) => {
             const state = inputState(port)
@@ -265,7 +277,50 @@ export function NodeCard({ id, selected }: NodeProps) {
             )
           })}
 
-          {ports.inputs.length > 0 && ports.outputs.length > 0 && (
+          {drivable.length > 0 && (() => {
+            const state = driveState()
+            return (
+              <div
+                title="Styring — én kobling som styrer flere parametere. Velg hvilke i Egenskaper."
+                className={`relative flex h-5 items-center gap-1.5 text-[10px] transition-opacity ${stateOpacity(state)}`}
+              >
+                <PortDot
+                  id={DRIVE_PORT_ID}
+                  side="left"
+                  state={state}
+                  color={PARAM_META.color}
+                  title="Styring — styr flere parametere med én kobling"
+                  label="Styring"
+                />
+                <span
+                  className={`min-w-0 truncate ${state === 'compatible' ? 'text-zinc-100' : 'text-zinc-400'}`}
+                >
+                  Styring
+                </span>
+                <span className="ml-auto shrink-0">
+                  {driveEdge ? (
+                    driveCount > 0 ? (
+                      <span className="rounded bg-sky-400/10 px-1 text-[9px] text-sky-300">
+                        {driveCount} {driveCount === 1 ? 'parameter' : 'parametere'}
+                      </span>
+                    ) : (
+                      <span className="rounded bg-amber-400/10 px-1 text-[9px] text-amber-300">
+                        velg i Egenskaper
+                      </span>
+                    )
+                  ) : (
+                    <TypeChip
+                      label="Tall"
+                      color={PARAM_META.color}
+                      title="Alle valgte parametere styres av denne verdien"
+                    />
+                  )}
+                </span>
+              </div>
+            )
+          })()}
+
+          {(ports.inputs.length > 0 || drivable.length > 0) && ports.outputs.length > 0 && (
             <div className="my-1 h-px bg-zinc-800/70" />
           )}
 

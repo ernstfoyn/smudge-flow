@@ -12,6 +12,7 @@ import type {
 import { topoSortScope } from './topoSort'
 import { GraphError } from './errors'
 import { resolveParamsAt } from './params'
+import { isDrivableParam } from './drive'
 import type { NodeRegistry } from './registry'
 import type { RenderServices } from './types'
 
@@ -87,8 +88,15 @@ export class Evaluator {
     const byId = new Map(scope.nodes.map((n) => [n.id, n]))
     const incoming = new Map<string, GraphEdge[]>()
     const paramEdges = new Map<NodeId, GraphEdge[]>()
+    const driveEdges = new Map<NodeId, GraphEdge[]>()
 
     for (const e of scope.edges) {
+      if (e.kind === 'drive') {
+        const list = driveEdges.get(e.target)
+        if (list) list.push(e)
+        else driveEdges.set(e.target, [e])
+        continue
+      }
       if (e.kind === 'param') {
         const list = paramEdges.get(e.target)
         if (list) list.push(e)
@@ -153,6 +161,17 @@ export class Evaluator {
       // --- Vanlig node -----------------------------------------------------
       const def = this.registry.get(node.type)
       const params = resolveParamsAt(node, frame, phase, def)
+
+      // Styring av hele noden: verdien gjelder alle valgte parametere.
+      // Enkeltkoblinger under overstyrer, siden de er mer spesifikke.
+      for (const edge of driveEdges.get(id) ?? []) {
+        const value = outputs.get(edge.source)?.[edge.sourcePort]
+        if (typeof value !== 'number') continue
+        for (const key of node.drives ?? []) {
+          const param = def.params.find((p) => p.key === key)
+          if (param && isDrivableParam(param)) params[key] = clampToParam(value, param)
+        }
+      }
 
       // Parameter-koblinger: verdien fra kilden overstyrer parameteren.
       for (const edge of paramEdges.get(id) ?? []) {
