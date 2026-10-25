@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { DriveSettings, Graph, GraphEdge, GraphNode, GraphSettings, Keyframe, LfoConfig, NodeId } from '../engine/types'
+import type { DriveSettings, Graph, GraphEdge, GraphNode, GraphSettings, Keyframe, KeyframeEasing, LfoConfig, NodeId } from '../engine/types'
 import {
   PARAM_PORT_PREFIX,
   canConnectTypes,
@@ -10,6 +10,7 @@ import {
   nodeParamDefs,
   nodePorts,
   rekeySubgraph,
+  remapLayerKeys,
 } from '../engine/graph'
 import { wouldCreateCycle } from '../engine/topoSort'
 import { DEFAULT_DRIVE, DRIVE_PORT_ID, SIGNAL_NODE_TYPE, drivableParams } from '../engine/drive'
@@ -17,6 +18,7 @@ import { upsertKey } from '../engine/animation/keyframes'
 import { registry } from '../nodes'
 import { blockFromSelection } from '../blocks/builder'
 import { useLibraryStore } from './useLibraryStore'
+import { previewPortFor, type PreviewTarget } from '../engine/preview'
 import type { BlockTemplate } from '../blocks/types'
 import type { TrailStamp } from '../nodes/modifier/trail'
 import type { LayerSettings } from '../nodes/composite/stack'
@@ -30,6 +32,8 @@ interface GraphState {
   selection: NodeId[]
   /** Markerte koblinger (kan slettes med Delete). */
   selectedEdges: string[]
+  /** Noden som forhåndsvises i stedet for Viewport, eller null. */
+  preview: PreviewTarget | null
   /** Kort melding om siste kobling (feil eller info). */
   notice: string | null
   /** Kan angres / gjøres om? */
@@ -45,6 +49,10 @@ interface GraphState {
   moveNode: (id: NodeId, position: { x: number; y: number }) => void
   renameNode: (id: NodeId, title: string) => void
   toggleNode: (id: NodeId) => void
+  /** Viser valgt node i forhåndsvisningen, eller går tilbake til Viewport. */
+  togglePreviewNode: (id: NodeId) => void
+  /** Går tilbake til Viewport. */
+  clearPreview: () => void
 
   connect: (source: NodeId, sourcePort: string, target: NodeId, targetPort: string) => boolean
   disconnect: (edgeId: string) => void
@@ -57,6 +65,23 @@ interface GraphState {
   ungroup: (id: NodeId) => void
   /** Lager en ny kopi av en node (eller gruppe). */
   instantiate: (id: NodeId, offset?: { x: number; y: number }) => NodeId | null
+  /** Kopierer markerte noder og kablene mellom dem. Returnerer antall noder. */
+  copySelection: () => number
+  /** Ligger det noder på appens interne utklippstavle? */
+  hasClipboard: () => boolean
+  /**
+   * Limer inn det som sist ble kopiert. `position` er øvre venstre hjørne i
+   * grafkoordinater; uten den brukes et lite sprang fra originalen.
+   */
+  pasteClipboard: (position?: { x: number; y: number }) => NodeId[]
+  /**
+   * Dupliserer markerte noder. `restorePositions` brukes av Alt-dra: da
+   * lages kopiene der originalen ble sluppet, og originalen flyttes tilbake.
+   */
+  duplicateSelection: (
+    offset?: { x: number; y: number },
+    restorePositions?: Record<NodeId, { x: number; y: number }>,
+  ) => NodeId[]
   /** Legger til et stempel i trail-laget. */
   addStamp: (id: NodeId, u: number, v: number, newStroke: boolean) => void
   /** Tømmer trail-laget. */
@@ -79,10 +104,14 @@ interface GraphState {
   saveSelectionAsBlock: (name: string, description?: string) => BlockTemplate | null
 
   setParam: (id: NodeId, key: string, value: unknown) => void
+  /** Setter flere parametere på én gang (ett historikksteg). */
+  setParams: (id: NodeId, patch: Record<string, unknown>) => void
   /** Setter innstillinger for ett lag i en lagstabel (nøklet på kant-id). */
   setLayerSetting: (id: NodeId, edgeId: string, patch: Partial<LayerSettings>) => void
   resetParams: (id: NodeId) => void
   setKeyframe: (id: NodeId, path: string, frame: number, value: unknown) => void
+  /** Endrer overgangen fra en keyframe til neste. */
+  setKeyframeEasing: (id: NodeId, path: string, frame: number, easing: KeyframeEasing) => void
   removeKeyframe: (id: NodeId, path: string, frame: number) => void
   setLfo: (id: NodeId, path: string, patch: Partial<LfoConfig>) => void
 
@@ -105,6 +134,57 @@ interface GraphState {
 
 let counter = 0
 const nextId = (type: string) => `${type}-${Date.now().toString(36)}-${counter++}`
+
+interface SelectionClipboard {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  /** Hvor mange ganger den er limt inn, så gjentatt lim ikke legger alt oppå hverandre. */
+  pasteCount: number
+}
+
+let selectionClipboard: SelectionClipboard | null = null
+
+/**
+ * Lager nye noder og kabler av et utvalg. Nye ID-er overalt, og kabler som
+ * bare gikk mellom de kopierte nodene, følger med. Kabler ut av utvalget
+ * kopieres ikke — de ville pekt på noe kopien ikke eier.
+ */
+function cloneSelection(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  delta: { x: number; y: number },
+): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const selected = new Set(nodes.map((node) => node.id))
+  const idMap = new Map<NodeId, NodeId>()
+  const edgeMap = new Map<string, string>()
+
+  const copies = nodes.map((node) => {
+    const id = nextId(node.type)
+    idMap.set(node.id, id)
+    const copy = structuredClone(node)
+    copy.id = id
+    copy.position = { x: node.position.x + delta.x, y: node.position.y + delta.y }
+    if (copy.group) copy.group = rekeySubgraph(copy.group, id)
+    return copy
+  })
+
+  const copiedEdges = edges
+    .filter((edge) => selected.has(edge.source) && selected.has(edge.target))
+    .map((edge) => {
+      const source = idMap.get(edge.source)!
+      const target = idMap.get(edge.target)!
+      const id = `${source}.${edge.sourcePort}->${target}.${edge.targetPort}`
+      edgeMap.set(edge.id, id)
+      return { ...structuredClone(edge), id, source, target }
+    })
+
+  // Lagstabelens per-lag-innstillinger er nøklet på kabel-ID-er.
+  for (const copy of copies) {
+    copy.params = remapLayerKeys(copy.params, edgeMap)
+  }
+
+  return { nodes: copies, edges: copiedEdges }
+}
 
 /**
  * Fjerner en node (med sine kant) inne i en gruppe.
@@ -213,13 +293,14 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   selected: null,
   selection: [],
   selectedEdges: [],
+  preview: null,
   notice: null,
   canUndo: false,
   canRedo: false,
   undoLabel: null,
   redoLabel: null,
 
-  setGraph: (graph) => set({ graph }),
+  setGraph: (graph) => set({ graph, preview: null }),
 
   addNode: (type, position) => {
     if (!registry.has(type)) return null
@@ -236,6 +317,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
    */
   removeNode: (id) =>
     set((s) => ({
+      preview: s.preview?.nodeId === id ? null : s.preview,
       graph: {
         ...s.graph,
         nodes: s.graph.nodes
@@ -272,6 +354,29 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         ),
       },
     })),
+
+  togglePreviewNode: (id) => {
+    const { graph, preview } = get()
+    const node = graph.nodes.find((n) => n.id === id)
+    if (!node) return
+
+    if (preview?.nodeId === id) {
+      set({ preview: null })
+      return
+    }
+
+    const portId = previewPortFor(node)
+    if (!portId) {
+      set({
+        notice: `«${node.title}» har ingen bildeutgang å forhåndsvise. 3D-objekter må gjennom en 3D-scene først.`,
+      })
+      return
+    }
+
+    set({ preview: { nodeId: id, portId }, notice: null })
+  },
+
+  clearPreview: () => set({ preview: null }),
 
   connect: (source, sourcePort, target, targetPort) => {
     const { graph } = get()
@@ -526,6 +631,87 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       notice: `Lagde kopi av «${node.title}».`,
     })
     return copyId
+  },
+
+  hasClipboard: () => !!selectionClipboard?.nodes.length,
+
+  copySelection: () => {
+    const { graph, selection } = get()
+    const ids = new Set(selection)
+    if (!ids.size) return 0
+
+    const nodes = graph.nodes.filter((node) => ids.has(node.id))
+    if (!nodes.length) return 0
+
+    const edges = graph.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target))
+    selectionClipboard = {
+      nodes: structuredClone(nodes),
+      edges: structuredClone(edges),
+      pasteCount: 0,
+    }
+    return nodes.length
+  },
+
+  pasteClipboard: (position) => {
+    const clipboard = selectionClipboard
+    if (!clipboard?.nodes.length) return []
+
+    let delta: { x: number; y: number }
+    if (position) {
+      const minX = Math.min(...clipboard.nodes.map((n) => n.position.x))
+      const minY = Math.min(...clipboard.nodes.map((n) => n.position.y))
+      delta = { x: position.x - minX, y: position.y - minY }
+    } else {
+      const step = 40 + clipboard.pasteCount * 20
+      delta = { x: step, y: step }
+    }
+    clipboard.pasteCount += 1
+
+    const { nodes, edges } = cloneSelection(clipboard.nodes, clipboard.edges, delta)
+    if (!nodes.length) return []
+
+    const ids = nodes.map((node) => node.id)
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: [...s.graph.nodes, ...nodes],
+        edges: [...s.graph.edges, ...edges],
+      },
+      selected: ids[ids.length - 1],
+      selection: ids,
+      selectedEdges: [],
+    }))
+    return ids
+  },
+
+  duplicateSelection: (offset = { x: 40, y: 40 }, restorePositions) => {
+    const { graph, selection } = get()
+    const ids = new Set(selection)
+    const sources = graph.nodes.filter((node) => ids.has(node.id))
+    if (!sources.length) return []
+
+    const { nodes, edges } = cloneSelection(sources, graph.edges, offset)
+    if (!nodes.length) return []
+    const newIds = nodes.map((node) => node.id)
+
+    const originals = restorePositions
+      ? graph.nodes.map((node) => {
+          const position = restorePositions[node.id]
+          return position ? { ...node, position } : node
+        })
+      : graph.nodes
+
+    set({
+      graph: {
+        ...graph,
+        nodes: [...originals, ...nodes],
+        edges: [...graph.edges, ...edges],
+      },
+      selected: newIds[newIds.length - 1],
+      selection: newIds,
+      selectedEdges: [],
+    })
+    return newIds
   },
 
   /**
@@ -790,6 +976,16 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       },
     })),
 
+  setParams: (id, patch) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) =>
+          n.id === id ? { ...n, params: { ...n.params, ...patch } } : n,
+        ),
+      },
+    })),
+
   /**
    * Setter innstillinger for ett lag i en lagstabel.
    *
@@ -838,6 +1034,25 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           const tracks: Record<string, Keyframe[]> = { ...(n.tracks ?? {}) }
           tracks[path] = upsertKey(tracks[path] ?? [], frame, value)
           return { ...n, tracks }
+        }),
+      },
+    })),
+
+  setKeyframeEasing: (id, path, frame, easing) =>
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((n) => {
+          if (n.id !== id || !n.tracks?.[path]) return n
+          return {
+            ...n,
+            tracks: {
+              ...n.tracks,
+              [path]: n.tracks[path].map((k) =>
+                k.frame === frame ? { ...k, interpolation: easing } : k,
+              ),
+            },
+          }
         }),
       },
     })),
@@ -957,7 +1172,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   setSelectedEdges: (selectedEdges) => set({ selectedEdges }),
 
-  reset: () => set({ graph: defaultGraph(), selected: null }),
+  reset: () => set({ graph: defaultGraph(), selected: null, preview: null }),
 }))
 
 // Alle endringer i grafen registreres i historikken automatisk.

@@ -194,9 +194,13 @@ describe('signal-noden', () => {
       { ...defaultsFor(signalNode), ...params },
     ) as { signal: number }).signal
 
-  it('er den eneste synlige kurvenoden, med ett Signal-uttak', () => {
+  it('er den synlige signalkurven, med ett Signal-uttak', () => {
     const listed = registry.listed().filter((d) => d.category === 'curve')
-    expect(listed.map((d) => d.type)).toEqual(['curve.signal'])
+    const types = listed.map((d) => d.type)
+    expect(types).toContain('curve.signal')
+    expect(types).toContain('value.math')
+    expect(types).toContain('value.remap')
+    expect(types).toContain('value.switch')
     expect(signalNode.outputs).toEqual([{ id: 'signal', label: 'Signal', type: 'number' }])
     expect(registry.has('curve.sine')).toBe(true) // eldre grafer virker fortsatt
     expect(registry.has('source.loop')).toBe(true)

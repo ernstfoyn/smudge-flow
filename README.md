@@ -62,8 +62,23 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `source.gradient` | kilde | Orbit `gradient.js` + `makeGradient()` |
 | `source.motionGraphics` | kilde | Orbit `motion-graphics.js` (prikkefelt, fliser, vifte, striper, ovaler) |
 | `source.image` | kilde | Smudge `trailTexture.js` (bilde/video) |
+| `source.text2D` | kilde | Ny — tekst på gjennomsiktig lerret |
+| `source.shape2D` | kilde | Ny — rektangel, ellipse, trekant, diamant, stjerne og polygon |
+| `mask.shape` | maske | Ny — fasong- og gradientmaske |
+| `mask.key` | maske | Ny — maske fra lysstyrke eller chroma key |
+| `modifier.mask` | maske | Ny — klipper et bilde med en maske |
+| `mask.combine` | maske | Ny — union, snitt eller fratrekk av to masker |
+| `modifier.fit` | modifikator | Ny — beskjær og tilpass bilde/video til formatet |
+| `modifier.displace` | modifikator | Ny — forskyv bildet med et kart |
+| `modifier.echo` | modifikator | Ny — etterslep fra tidligere frames |
+| `modifier.pattern` | modifikator | Ny — fragmentert prisme fra patternable |
+| `source.audio` | kilde | Ny — lydfil med nivå, bass, mellomtone og diskant |
 | `curve.signal` | signal | Ny — en kurve (sinus, trekant, støy, tegnet …) med hastighet og fase. Kobles til «Styring» på en node |
 | `source.loop` | signal (skjult) | Ny — eldre alt-i-ett loop-generator, brukt av blokkene |
+| `value.math` | signal | Ny — regn på to tall/signaler: legg sammen, multipliser, min/maks, potens, modulo, avrunding |
+| `value.remap` | signal | Ny — flytt et tallområde til et annet, med klemming og smoothstep |
+| `value.switch` | signal | Ny — velg én av fire tallinnganger |
+| `image.switch` | kompositt | Ny — velg ett av fire bilder eller videoer |
 | `source.mesh3D` | kilde | Ny — prosedural 3D-geometri (boks/kule/torus/plan/sylinder/ikosaeder) |
 | `source.blob3D` | kilde | Smudge `blob.glsl.js` — raymarchet metaball-form |
 | `source.obj` | kilde | Orbit `obj-import.js` — importerte 3D-modeller |
@@ -192,6 +207,91 @@ Den kobles naturlig etter trail-laget, så du kan male inn i formen:
 ```
 bilde ─▶ modifier.trail ─▶ source.blob3D ─▶ modifier.look.chromatic ─▶ viewport
 ```
+
+---
+
+## Bilde og video
+
+`source.image` kan bruke en lokal fil eller en URL. Lokale filer lagres i
+nettleserens filbank (IndexedDB, `smudgeflow.media.v1`), og noden lagrer bare
+en `assetId` med navn, type og dimensjoner. Da holder prosjektfilen seg liten,
+og samme fil kan brukes av flere noder.
+
+- Velg **Fil** for å laste opp, eller dra filen rett på noden. Slippes den på
+  lerretet, lages en ny Bilde/video-node.
+- **Cmd/Ctrl + V** limer inn et bilde fra utklippstavlen.
+- **URL** brukes for filer som ligger ute. Adressen må tillate CORS for at
+  eksporten skal virke.
+- Video samplet per frame. «Bruk videotid» følger animasjonens tid; slår du
+  den av, brukes første frame.
+
+Prosjektfilen inneholder ikke selve filene. Åpnes den i en annen nettleser
+eller på en annen maskin, viser noden at filen mangler og tilbyr å koble den
+til på nytt.
+
+## 2D-tekst og fasonger
+
+`source.text2D` tegner tekst på et gjennomsiktig lerret, med font, størrelse,
+vekt, farge, justering og linjeavstand. `source.shape2D` tegner rektangel,
+ellipse, trekant, diamant, stjerne eller polygon med fyll, kant og rotasjon.
+Begge følger grafens oppløsning og kan blandes med bilder i en Lagstabel.
+
+### Masker og matte
+
+Masker bruker alfa: hvitt er synlig og gjennomsiktig er skjult. Da virker
+myke kanter naturlig, og masken kan brukes direkte på et bilde.
+
+- **Fasongmaske** lager ellipse, rektangel, trekant eller lineær/radial gradient.
+- **Bildemaske** lager en maske fra lysstyrken i et bilde, eller fjerner en farge med chroma key.
+- **Bruk maske** klipper et bilde med masken, med valgfri invertering.
+- **Kombiner masker** lager union, snitt eller fratrekk av to masker.
+
+Vanlig kjede:
+
+```
+2D-tekst ─▶ Bruk maske ─▶ Lagstabel ─▶ Viewport
+Fasongmaske ─▶ Maske
+```
+
+### Fragmentprisme
+
+`modifier.pattern` er patternable-mekanikken fra `Verktoy/pattern-studio`:
+bildet bygges om til ett glyph-lag og tegnes på nytt inn i hvert rutenett,
+forskjøvet etter kolonne og rad. Parametrene er glyphstørrelse, rutestørrelse,
+gridforskyvning, squeeze, kompresjon, rotasjon, tilfeldig bevegelse og fart.
+Velg **Word** for tett rutenett eller **Sentence** for midtrad og diagonaler.
+
+Alle parametrene kan animeres med keyframes eller signaler. Den tilfeldige
+bevegelsen bruker animasjonens tid og «Bevegelsesfart».
+
+### Lydstyring
+
+`source.audio` leser en lokal lydfil eller en URL og gir fire tallutganger:
+**Nivå**, **Bass**, **Mellomtone** og **Diskant**. De kan kobles til en
+parameterdiamant eller til Styring, akkurat som et signal.
+
+Analysen skjer per frame rundt animasjonens tid, så den er deterministisk.
+Er lyden kortere enn animasjonen, kan den loopes. I Eksport velger du hvilket
+lydspor som skal muxes inn i videoen. MP4 bruker AAC når nettleseren støtter
+det, ellers prøves Opus. WebM bruker Opus eller Vorbis. Lyden tilpasses
+videoens nøyaktige lengde.
+
+### Echo
+
+`modifier.echo` tegner de siste framesene bak det gjeldende bildet, med
+valgfri forskyvning og utfading. Historikken bygges opp frame for frame under
+avspilling og eksport. Hopper du i tidslinjen, starter historikken på nytt.
+
+### Bildeverktøy
+
+- **Beskjær / tilpass** velger dekk, pass inn eller strekk, med utsnitt, skala og forskyvning.
+- **Displace** forskyver bildet med et kart. Rød kanal styrer X og grønn kanal Y; 0,5 i kartet betyr ingen forskyvning.
+
+### Keyframe-overganger
+
+Når du markerer en keyframe i tidslinjen, kan du velge overgangen fram til
+neste keyframe: lineær, hold, myk start, myk slutt, myk start og slutt, sprett
+eller elastisk. Valget gjelder fra den valgte keyframen og til neste.
 
 ---
 

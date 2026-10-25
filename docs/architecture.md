@@ -222,6 +222,19 @@ De eldre nodene `curve.sine`, `curve.triangle` … og `source.loop` virker
 fortsatt i eksisterende grafer og i blokkene, men er skjult i paletten
 (`NodeDefinition.hidden`).
 
+### Matematikk, remap og velgere
+
+| Node | Virkning |
+|---|---|
+| `value.math` | Regner på A og B: addisjon, subtraksjon, multiplikasjon, divisjon, min/maks, potens, modulo og avrunding. Ukoblede innganger bruker faste verdier. |
+| `value.remap` | Flytter et tallområde til et annet, med valgfri klemming og smoothstep. |
+| `value.switch` | Velger én av fire tallinnganger. Indeksen kan styres av et signal. |
+| `image.switch` | Velger ett av fire bilder/videoer og tegner det til et lerret. |
+
+Alle er rene funksjoner av innganger, parametere og `ctx.frame`, og kan derfor
+brukes både i preview og eksport. `value.math` og `value.remap` kan kobles til
+en parameterdiamant (rå verdi) eller til Styring (modulering).
+
 ### Loop-generatoren (`source.loop`)
 
 Lager verdier som er **løkkesikre**: verdien ved frame 0 er identisk med
@@ -294,6 +307,59 @@ Logikken ligger i `src/engine/drive.ts` og er dekket av `tests/drive.test.ts`.
 Diamantene (én parameter) ligger på venstre side sammen med alle andre
 innganger. Utganger ligger alltid til høyre.
 
+### Masker og matte
+
+Masker representeres som et lerret med **alfa**, ikke som svart/hvitt. Hvitt
+med full alfa er synlig, gjennomsiktig er skjult. Det gjør at myke kanter og
+gradienter virker uten egne terskeltrinn.
+
+| Node | Virkning |
+|---|---|
+| `mask.shape` | Ellipse, rektangel, trekant, lineær eller radial gradient. Myk kant via blur-filter. |
+| `mask.key` | Alfa fra lysstyrke (luma) eller avstand til en nøkkelfarge (chroma key). |
+| `modifier.mask` | Tegner bildet og bruker `destination-in` med masken. Kan invertere. |
+| `mask.combine` | Union (`source-over`), snitt (`destination-in`) eller fratrekk (`destination-out`). |
+
+En invertert maske lages ved å fylle hvitt og trekke masken fra med
+`destination-out`. Alle nodene er rene funksjoner av input og parametere, så
+de virker likt i preview og eksport.
+
+### Lyd og echo
+
+- `source.audio` dekoder en lydfil via Web Audio og analyserer et vindu rundt
+  `ctx.time`. Den bruker radix-2 FFT og gir `level`, `bass`, `mid` og `treble`
+  i 0..1. Analysen er deterministisk for en gitt tid i lyden.
+- `modifier.echo` holder en historikk med tidligere frame-lerreter i
+  `ctx.nodeCache`. Historikken nullstilles på frame 0, slik at eksporten
+  starter rent. Noden er laget for sekvensiell avspilling/eksport; hopper du i
+  tidslinjen, starter historikken på nytt.
+
+Eksporten kan muxe inn ett lydspor fra en `source.audio`-node. Lydbufferen
+dekodes via Web Audio, tilpasses `frames / fps` og kodes med AAC i MP4 eller
+Opus/Vorbis i WebM. `encodeFrames` bruker MediaBunny `AudioBufferSource` og
+`addAudioTrack`; resultatet melder `audioIncluded` slik at UI-et kan vise om
+lyden faktisk kom med.
+
+### Fragmentprisme
+
+`modifier.pattern` er en Canvas 2D-port av patternable fra
+`Verktoy/pattern-studio`. Noden bygger ett glyph-lag av inputbildet og tegner
+det inn i hvert rutenett, klippet og forskjøvet etter kolonne og rad. `grid`
+tegner hele rutenettet; `echo` tegner midtrad, midtkolonne og diagonale kopier.
+Squeeze, kompresjon, rotasjon og per-rute jitter følger den opprinnelige
+mekanikken. Parametrene er animerbare og erstatter appens egne kurvevalg.
+
+### Bildeverktøy
+
+| Node | Virkning |
+|---|---|
+| `modifier.fit` | Beskjærer og tilpasser bilde/video med `cover`, `contain` eller `stretch`, utsnitt, skala og forskyvning. |
+| `modifier.displace` | Leser rød kanal som X-forskyvning og grønn kanal som Y-forskyvning fra et kart. 0,5 er nøytralt. |
+
+Begge tegner inputen inn i grafens oppløsning, så de virker for lerret, bilde
+og video. `displace` er implementert på CPU og er derfor deterministisk og lik
+i preview og eksport.
+
 ### Parameter-koblinger
 
 En node kan styre en parameter i en annen node. I UI-et: dra fra en
@@ -314,6 +380,11 @@ node.params → keyframes → LFO → parameter-kobling → clamp/round
 En koblet parameter overstyrer keyframes for samme parameter (koblingen er
 det sterkeste signalet). Kilden evalueres alltid før målnoden, og
 parameterkoblingen teller som en avhengighet i den topologiske sorteringen.
+
+Hver keyframe har en overgang som gjelder fram til neste keyframe: `linear`,
+`hold`, `ease-in`, `ease-out`, `ease-in-out`, `bounce` eller `elastic`.
+Overgangen ligger på den utgående keyframen og brukes av `valueAt()` i
+`src/engine/animation/keyframes.ts`.
 
 ---
 

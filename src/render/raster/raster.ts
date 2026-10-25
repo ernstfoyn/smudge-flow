@@ -58,9 +58,8 @@ export function drawRaster(
     isLayer: boolean
   }
 
-  const src = source as HTMLCanvasElement
-  const w = src.width
-  const h = src.height
+  const w = target.width
+  const h = target.height
   const ctx = target.getContext('2d')!
 
   ctx.save()
@@ -69,13 +68,16 @@ export function drawRaster(
   ctx.globalCompositeOperation = 'source-over'
   ctx.clearRect(0, 0, w, h)
 
+  // Tegn inputen inn på mållerretet først. Da virker rasteret på både
+  // lerret, bilde og video, og alle skaleres til grafens oppløsning.
+  ctx.drawImage(source, 0, 0, w, h)
+
   if (p.pattern === 'off') {
-    ctx.drawImage(src, 0, 0)
     ctx.restore()
     return
   }
 
-  const pixels = src.getContext('2d')!.getImageData(0, 0, w, h).data
+  const pixels = ctx.getImageData(0, 0, w, h).data
   const cell = Math.max(3, Math.round(p.cellSize))
 
   ctx.fillStyle = p.paper
@@ -136,7 +138,7 @@ export function drawRaster(
 
   if (p.strength < 100) {
     ctx.globalAlpha = 1 - Math.max(0, p.strength) / 100
-    ctx.drawImage(src, 0, 0)
+    ctx.drawImage(source, 0, 0, w, h)
   }
 
   ctx.restore()

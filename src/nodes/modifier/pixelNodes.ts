@@ -5,10 +5,20 @@ import { blur, pixelate, warp } from '../../render/raster/effects'
  * Pikseloperasjoner leser bildet, endrer rådata og skriver det tilbake.
  * Alle tre deler samme kontrakt: canvas inn → canvas ut.
  */
-function readPixels(source: HTMLCanvasElement) {
-  const w = source.width
-  const h = source.height
-  const image = source.getContext('2d')!.getImageData(0, 0, w, h)
+/**
+ * Tegner inputen inn på mållerretet og leser pikslene derfra. Da virker
+ * effektene også når kilden er et bilde eller et video-element, ikke bare
+ * et lerret.
+ */
+function readPixels(
+  source: CanvasImageSource,
+  target: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D },
+) {
+  const w = target.canvas.width
+  const h = target.canvas.height
+  target.ctx.clearRect(0, 0, w, h)
+  target.ctx.drawImage(source, 0, 0, w, h)
+  const image = target.ctx.getImageData(0, 0, w, h)
   return { image, w, h }
 }
 
@@ -31,12 +41,12 @@ export const blurNode: NodeDefinition = {
   ],
   evaluate(ctx: EvalContext, { in: input }, p) {
     const target = ctx.render.canvas(ctx.scopeKey)
-    const source = input as HTMLCanvasElement | undefined
+    const source = input as CanvasImageSource | undefined
     if (!source) {
       target.ctx.clearRect(0, 0, target.width, target.height)
       return { out: target.canvas }
     }
-    const { image, w, h } = readPixels(source)
+    const { image, w, h } = readPixels(source, target)
     image.data.set(blur(image.data, w, h, Number(p.radius ?? 6)))
     writePixels(target, image)
     return { out: target.canvas }
@@ -54,12 +64,12 @@ export const pixelateNode: NodeDefinition = {
   ],
   evaluate(ctx: EvalContext, { in: input }, p) {
     const target = ctx.render.canvas(ctx.scopeKey)
-    const source = input as HTMLCanvasElement | undefined
+    const source = input as CanvasImageSource | undefined
     if (!source) {
       target.ctx.clearRect(0, 0, target.width, target.height)
       return { out: target.canvas }
     }
-    const { image, w, h } = readPixels(source)
+    const { image, w, h } = readPixels(source, target)
     image.data.set(pixelate(image.data, w, h, Number(p.pixelSize ?? 12)))
     writePixels(target, image)
     return { out: target.canvas }
@@ -86,12 +96,12 @@ export const warpNode: NodeDefinition = {
   ],
   evaluate(ctx: EvalContext, { in: input }, p) {
     const target = ctx.render.canvas(ctx.scopeKey)
-    const source = input as HTMLCanvasElement | undefined
+    const source = input as CanvasImageSource | undefined
     if (!source) {
       target.ctx.clearRect(0, 0, target.width, target.height)
       return { out: target.canvas }
     }
-    const { image, w, h } = readPixels(source)
+    const { image, w, h } = readPixels(source, target)
     image.data.set(
       warp(
         image.data,

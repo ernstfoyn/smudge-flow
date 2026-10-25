@@ -34,8 +34,8 @@ export function topoSortScope(
     const src = byId.get(e.source)
     const dst = byId.get(e.target)
     if (!src || !dst) continue
-    // Deaktiverte noder bryter kjeden; verdiene faller tilbake til standard.
-    if (src.enabled === false || dst.enabled === false) continue
+    // Deaktiverte noder er fortsatt en del av kjeden: de sluses forbi i
+    // evaluatoren, slik at kablene og rekkefølgen bevares.
     upstream.get(e.target)!.push(e.source)
     downstream.get(e.source)!.push(e.target)
   }

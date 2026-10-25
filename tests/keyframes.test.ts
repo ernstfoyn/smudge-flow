@@ -115,3 +115,59 @@ describe('lfo', () => {
     }
   })
 })
+
+describe('keyframe-easing', () => {
+  const keysWith = (easing: Parameters<typeof upsertKey>[3]) =>
+    upsertKey(upsertKey([], 0, 0, easing), 10, 100)
+
+  it('myk start og slutt treffer endepunktene', () => {
+    const keys = keysWith('ease-in-out')
+    expect(valueAt(0, keys, 0)).toBe(0)
+    expect(valueAt(0, keys, 5)).toBe(50)
+    expect(valueAt(0, keys, 10)).toBe(100)
+    expect(valueAt(0, keys, 2.5)).toBeLessThan(25)
+    expect(valueAt(0, keys, 7.5)).toBeGreaterThan(75)
+  })
+
+  it('myk start og myk slutt er ikke lineære', () => {
+    expect(valueAt(0, keysWith('ease-in'), 5)).toBeLessThan(50)
+    expect(valueAt(0, keysWith('ease-out'), 5)).toBeGreaterThan(50)
+  })
+
+  it('sprett og elastisk treffer målverdien til slutt', () => {
+    expect(valueAt(0, keysWith('bounce'), 10)).toBe(100)
+    expect(valueAt(0, keysWith('elastic'), 10)).toBe(100)
+    expect(valueAt(0, keysWith('bounce'), 5)).not.toBe(50)
+  })
+
+  it('beholder overgangen når verdien på samme frame oppdateres', () => {
+    let keys = keysWith('ease-in')
+    keys = upsertKey(keys, 0, 10)
+    expect(keys[0].interpolation).toBe('ease-in')
+  })
+
+  it('klemmer fargekanaler selv når en elastisk kurve overdriver', () => {
+    const keys = upsertKey(upsertKey([], 0, '#000000', 'elastic'), 10, '#ffffff')
+    for (let frame = 0; frame <= 10; frame += 0.25) {
+      const value = String(valueAt('#000000', keys, frame))
+      expect(value).toMatch(/^#[0-9a-f]{6}$/i)
+      for (const i of [1, 3, 5]) {
+        const channel = parseInt(value.slice(i, i + 2), 16)
+        expect(channel).toBeGreaterThanOrEqual(0)
+        expect(channel).toBeLessThanOrEqual(255)
+      }
+    }
+  })
+
+  it('lagrer valgt overgang i butikken', async () => {
+    const { useGraphStore } = await import('../src/state/useGraphStore')
+    useGraphStore.getState().reset()
+    const id = useGraphStore.getState().addNode('source.gradient', { x: 0, y: 0 })!
+    useGraphStore.getState().setKeyframe(id, 'angle', 0, 0)
+    useGraphStore.getState().setKeyframe(id, 'angle', 10, 360)
+    useGraphStore.getState().setKeyframeEasing(id, 'angle', 0, 'bounce')
+    const keys = useGraphStore.getState().graph.nodes.find((n) => n.id === id)?.tracks?.angle
+    expect(keys?.[0].interpolation).toBe('bounce')
+    expect(keys?.[1].interpolation).toBe('linear')
+  })
+})

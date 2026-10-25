@@ -79,6 +79,8 @@ export function ExportPanel() {
     width: '',
     height: '',
   })
+  /** null = bruk første lydnode, 'none' = ingen lyd, ellers valgt node. */
+  const [audioChoice, setAudioChoice] = useState<string | null>(null)
 
   const exportNode = graph.nodes.find((n) => n.type === 'output.export')
   const target = exportNode ?? graph.nodes.find((n) => n.type === 'output.viewport')
@@ -86,6 +88,12 @@ export function ExportPanel() {
   const aspect = aspectPresetFor(graph.settings.width, graph.settings.height)
   const aspectPreset = ASPECT_PRESETS.find((preset) => preset.id === aspect)
   const duration = graph.settings.frames / graph.settings.fps
+  const audioNodes = graph.nodes.filter((node) => node.type === 'source.audio')
+  const audioNode =
+    audioChoice === 'none'
+      ? undefined
+      : graph.nodes.find((node) => node.id === audioChoice) ?? audioNodes[0]
+  const audioValue = audioNode?.id ?? 'none'
 
   const setFormat = (next: OutputFormat) => {
     setSettings({ exportFormat: next })
@@ -122,6 +130,19 @@ export function ExportPanel() {
         outputNodeId: outputNode.id,
         canvas,
         prefer: format,
+        audio: audioNode
+          ? {
+              assetId:
+                audioNode.params.sourceMode === 'url'
+                  ? ''
+                  : String(audioNode.params.assetId ?? ''),
+              src:
+                audioNode.params.sourceMode === 'url'
+                  ? String(audioNode.params.src ?? '')
+                  : '',
+              loop: audioNode.params.loopAudio !== false,
+            }
+          : undefined,
         signal: controller.signal,
         render: renderServices,
         onProgress: (p, frame, total) =>
@@ -133,9 +154,14 @@ export function ExportPanel() {
       })
 
       const url = URL.createObjectURL(result.blob)
+      const audioNote = audioNode
+        ? result.audioIncluded
+          ? ' · med lyd'
+          : ' · uten lyd'
+        : ''
       setStatus({
         kind: 'done',
-        message: `Ferdig · ${result.duration.toFixed(2)} s · ${result.extension.toUpperCase()}`,
+        message: `Ferdig · ${result.duration.toFixed(2)} s · ${result.extension.toUpperCase()}${audioNote}`,
         progress: 1,
         url,
         extension: result.extension,
@@ -224,6 +250,33 @@ export function ExportPanel() {
           {graph.settings.frames} frames · {duration.toFixed(2)} s
         </p>
       </section>
+
+      {audioNodes.length > 0 && (
+        <section className="flex min-w-0 flex-col gap-2">
+          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+            Lyd
+          </h3>
+          <label className="flex min-w-0 items-center gap-2">
+            <span className="w-20 shrink-0 text-[11px] text-zinc-400">Lydspor</span>
+            <select
+              value={audioValue}
+              onChange={(event) => setAudioChoice(event.target.value)}
+              className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100"
+            >
+              <option value="none">Ingen lyd</option>
+              {audioNodes.map((node) => (
+                <option key={node.id} value={node.id}>
+                  {node.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-[10px] leading-relaxed text-zinc-500">
+            Velges et lydspor, muxes det inn i videoen. Lyden tilpasses videoens lengde og
+            kan loopes.
+          </p>
+        </section>
+      )}
 
       <section className="flex min-w-0 flex-col gap-2">
         <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">

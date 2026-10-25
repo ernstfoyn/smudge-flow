@@ -4,6 +4,7 @@ import { usePlaybackStore } from '../state/usePlaybackStore'
 import { evaluator, lastOutputs, renderServices } from '../state/studio'
 import { registry } from '../nodes'
 import { HelpLink } from './primitives/HelpLink'
+import { resolvePreviewTarget } from '../engine/preview'
 
 /**
  * Forhåndsvisningen.
@@ -14,6 +15,8 @@ import { HelpLink } from './primitives/HelpLink'
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const graph = useGraphStore((s) => s.graph)
+  const preview = useGraphStore((s) => s.preview)
+  const clearPreview = useGraphStore((s) => s.clearPreview)
   const frame = usePlaybackStore((s) => s.frame)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,10 +29,10 @@ export function Viewport() {
     lastTime: 0,
   })
 
-  // Ny graf → må evalueres på nytt.
+  // Ny graf eller nytt forhåndsvisningsmål → må evalueres på nytt.
   useEffect(() => {
     state.current.dirty = true
-  }, [graph])
+  }, [graph, preview])
 
   // Renderstørrelsen følger grafens innstillinger, nedskalert i forhåndsvisning.
   // Eksporten setter størrelsen til full oppløsning (se exportGraph).
@@ -67,7 +70,7 @@ export function Viewport() {
       const changed = frame !== state.current.lastFrame
       if (!changed && !state.current.dirty) return
 
-      const target = current.nodes.find((n) => n.type === 'output.viewport')
+      const target = resolvePreviewTarget(current, useGraphStore.getState().preview)
       if (!target) return
 
       const canvas = canvasRef.current
@@ -89,13 +92,13 @@ export function Viewport() {
       if (canvas.height !== current.settings.height) canvas.height = current.settings.height
 
       try {
-        const outputs = await evaluator.evaluateFrame(current, frame, [target.id])
+        const outputs = await evaluator.evaluateFrame(current, frame, [target.nodeId])
         if (!alive) return
 
         // Behold resultatet, så UI-en kan vise det (maleputen).
         for (const [id, output] of outputs) lastOutputs.set(id, output)
 
-        const source = outputs.get(target.id)?.frame as CanvasImageSource | undefined
+        const source = outputs.get(target.nodeId)?.[target.portId] as CanvasImageSource | undefined
         const ctx = canvas.getContext('2d')!
         ctx.setTransform(1, 0, 0, 1, 0, 0)
         ctx.globalAlpha = 1
@@ -123,6 +126,7 @@ export function Viewport() {
   }, [])
 
   const aspect = graph.settings.width / graph.settings.height
+  const previewNode = preview ? graph.nodes.find((n) => n.id === preview.nodeId) : undefined
 
   return (
     <div className="flex h-full min-w-0 w-full items-center justify-center bg-[var(--stage-bg)] p-3">
@@ -143,6 +147,22 @@ export function Viewport() {
             Nodekort med en rød prikk mangler en påkrevd inngang.
             <HelpLink topic="feilsoking" />
           </p>
+        </div>
+      )}
+
+      {previewNode && (
+        <div className="absolute bottom-4 left-4 z-10 flex max-w-[calc(100%-2rem)] items-center gap-2 rounded-lg border border-lime-500/40 bg-[var(--stage-badge)] px-2.5 py-1.5 text-[10px] text-zinc-300 shadow-lg backdrop-blur">
+          <span className="text-zinc-500">Forhåndsviser</span>
+          <span className="max-w-[12rem] truncate font-semibold text-lime-300">
+            {previewNode.title}
+          </span>
+          <button
+            type="button"
+            onClick={clearPreview}
+            className="rounded border border-zinc-600 px-1.5 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
+          >
+            Tilbake
+          </button>
         </div>
       )}
 

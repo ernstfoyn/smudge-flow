@@ -8,7 +8,10 @@ import {
   driveSettings,
   isParamVisible,
 } from '../../engine/drive'
+import { isPreviewableType } from '../../engine/preview'
 import { CurveEditor } from './CurveEditor'
+import { MediaSourceField } from './MediaSourceField'
+import { AudioSourceField } from './AudioSourceField'
 import { HelpLink } from '../primitives/HelpLink'
 import { useGraphStore } from '../../state/useGraphStore'
 import { usePlaybackStore } from '../../state/usePlaybackStore'
@@ -190,6 +193,8 @@ export function Inspector() {
   const resetParams = useGraphStore((s) => s.resetParams)
   const removeNode = useGraphStore((s) => s.removeNode)
   const toggleNode = useGraphStore((s) => s.toggleNode)
+  const preview = useGraphStore((s) => s.preview)
+  const togglePreviewNode = useGraphStore((s) => s.togglePreviewNode)
   const setLfo = useGraphStore((s) => s.setLfo)
   const setKeyframe = useGraphStore((s) => s.setKeyframe)
   const reorderInput = useGraphStore((s) => s.reorderInput)
@@ -217,8 +222,17 @@ export function Inspector() {
   const isGroup = node.type === 'group'
   const def = isGroup ? null : registry.get(node.type)
   const params = def?.params ?? []
+  const canPreview = !isGroup && nodePorts(node).outputs.some((p) => isPreviewableType(p.type))
+  const isPreviewing = preview?.nodeId === node.id
   const editableParams = params.filter(
-    (p) => p.type !== 'layers' && p.type !== 'curve' && isParamVisible(p, node.params),
+    (p) =>
+      p.type !== 'layers' &&
+      p.type !== 'curve' &&
+      !(
+        (node.type === 'source.image' || node.type === 'source.audio') &&
+        p.key === 'src'
+      ) &&
+      isParamVisible(p, node.params),
   )
 
   /** Lagene som er koblet til en multiple-port, i tegnerrekkefølge. */
@@ -494,6 +508,21 @@ export function Inspector() {
           >
             {node.enabled === false ? 'Aktiver' : 'Deaktiver'}
           </button>
+          {canPreview && (
+            <button
+              type="button"
+              onClick={() => togglePreviewNode(node.id)}
+              title="Forhåndsvis denne noden (P)"
+              aria-pressed={isPreviewing}
+              className={`shrink-0 rounded border px-2 py-1 text-[11px] ${
+                isPreviewing
+                  ? 'border-lime-500/60 bg-lime-500/15 text-lime-300'
+                  : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+              }`}
+            >
+              {isPreviewing ? '◉ Viser' : '◎ Vis'}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => instantiate(node.id)}
@@ -519,6 +548,18 @@ export function Inspector() {
       )}
 
       {node.type === SIGNAL_NODE_TYPE && <CurveEditor node={node} />}
+
+      {node.type === 'source.image' && (
+        <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
+          <MediaSourceField node={node} />
+        </section>
+      )}
+
+      {node.type === 'source.audio' && (
+        <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
+          <AudioSourceField node={node} />
+        </section>
+      )}
 
       {layerPorts.map((port) => {
         const edges = graph.edges.filter((e) => e.target === node.id && e.targetPort === port.id)
@@ -557,9 +598,37 @@ export function Inspector() {
                 return (
                   <li
                     key={edge.id}
+                    onDragOver={(event) => {
+                      if (event.dataTransfer.types.includes('application/x-smudge-layer')) {
+                        event.preventDefault()
+                        event.dataTransfer.dropEffect = 'move'
+                      }
+                    }}
+                    onDrop={(event) => {
+                      const raw = event.dataTransfer.getData('application/x-smudge-layer')
+                      if (!raw) return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      const from = Number(raw)
+                      if (Number.isInteger(from) && from !== index) {
+                        reorderInput(node.id, port.id, from, index)
+                      }
+                    }}
                     className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1"
                   >
                     <div className="flex items-center gap-1.5">
+                      <span
+                        draggable
+                        title="Dra for å endre rekkefølgen"
+                        aria-label="Dra for å endre rekkefølgen"
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData('application/x-smudge-layer', String(index))
+                          event.dataTransfer.effectAllowed = 'move'
+                        }}
+                        className="cursor-grab select-none px-0.5 text-[11px] text-zinc-600 hover:text-zinc-300 active:cursor-grabbing"
+                      >
+                        ⠿
+                      </span>
                       <span className="w-4 text-[10px] tabular-nums text-zinc-600">
                         {index + 1}
                       </span>
@@ -657,7 +726,7 @@ export function Inspector() {
 
             <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
               {layersParam
-                ? 'Lag 1 er bunnen. Hvert lag har egen modus, dekkevne og synlighet.'
+                ? 'Lag 1 er bunnen. Dra i ⠿ (eller bruk pilene) for å endre rekkefølgen. Hvert lag har egen modus, dekkevne og synlighet.'
                 : 'Rekkefølgen er uten betydning for 3D (dybden avgjør), men brukes av gruppen.'}
             </p>
           </CollapsibleSection>

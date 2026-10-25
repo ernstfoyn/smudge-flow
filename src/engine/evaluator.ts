@@ -8,6 +8,8 @@ import type {
   NodeId,
   Outputs,
   ParamDef,
+  NodeDefinition,
+  ValueType,
 } from './types'
 import { topoSortScope } from './topoSort'
 import { GraphError } from './errors'
@@ -115,9 +117,28 @@ export class Evaluator {
       if (signal?.aborted) throw new DOMException('Avbrutt', 'AbortError')
 
       const node = byId.get(id)!
+      const disabled = node.enabled === false
 
       // --- Gruppe-node: egen graf, egen evaluering -------------------------
       if (node.type === 'group' && node.group) {
+        if (disabled) {
+          // En deaktivert gruppe sluses forbi: den første kompatible inngangen
+          // sendes videre til hver eksponert utgang, uten å evaluere innholdet.
+          const bypassed: Outputs = {}
+          for (const out of node.group.outputs) {
+            const candidate = node.group.inputs.find((input) => canPass(input.type, out.type))
+            if (!candidate) continue
+            const edges = incoming.get(`${id}\u0000${candidate.id}`) ?? []
+            const values = edges
+              .map((edge) => outputs.get(edge.source)?.[edge.sourcePort])
+              .filter((value) => value !== undefined)
+            const value = values[values.length - 1]
+            if (value !== undefined) bypassed[out.id] = value
+          }
+          outputs.set(id, bypassed)
+          continue
+        }
+
         const group = node.group
         const innerInjected = new Map<string, unknown>()
 
@@ -212,7 +233,7 @@ export class Evaluator {
           }
           inputs[port.id] = values
           inputEdges[port.id] = used
-          if (!values.length && !port.optional) {
+          if (!values.length && !port.optional && !disabled) {
             throw new GraphError(
               `«${node.title}» mangler input «${port.label}» — koble minst én kilde til porten.`,
             )
@@ -223,7 +244,7 @@ export class Evaluator {
         const edge = edges[edges.length - 1]
         const value = edge ? outputs.get(edge.source)?.[edge.sourcePort] : undefined
         if (edge && value !== undefined) inputEdges[port.id] = [edge]
-        if (value === undefined && !port.optional) {
+        if (value === undefined && !port.optional && !disabled) {
           throw new GraphError(
             `«${node.title}» mangler input «${port.label}» — koble en kilde til porten.`,
           )
@@ -247,12 +268,21 @@ export class Evaluator {
         signal,
       }
 
+      const memoKey = ctx.scopeKey
+
+      // Deaktivert node: send verdien forbi i stedet for å evaluere den.
+      if (disabled) {
+        const bypassed = bypassOutputs(def, inputs, ctx)
+        this.render.touch(memoKey)
+        this.bumpVersion(memoKey)
+        outputs.set(id, bypassed)
+        continue
+      }
+
       const timeDependent =
         typeof def.timeDependent === 'function'
           ? def.timeDependent(params)
           : (def.timeDependent ?? true)
-
-      const memoKey = ctx.scopeKey
 
       // Uforanderlig output (lastet bilde, parset geometri): mellomlagres
       // på tvers av frames.
@@ -373,6 +403,61 @@ export class Evaluator {
     this.memo.clear()
     this.staticCache.clear()
   }
+}
+
+/**
+ * Kan en verdi av `source` sendes videre til en utgang av `target`?
+ * Samme regler som port-kompatibiliteten i grafen.
+ */
+function canPass(source: ValueType, target: ValueType): boolean {
+  if (source === target) return true
+  if (target === 'drawable') return source === 'canvas' || source === 'drawable'
+  if (source === 'drawable' && target === 'canvas') return true
+  return false
+}
+
+/**
+ * «Forbi»-utganger for en deaktivert node.
+ *
+ * Den første kompatible inngangen sendes videre. Ved flere innganger foretrekkes
+ * «in», så «base», ellers den første — det gir forutsigbar oppførsel for både
+ * effektnoder og blanding. En flerinngang (som lagstabelen) sender det øverste
+ * laget videre.
+ *
+ * Bilder uten noen kompatibel inngang blir et gjennomsiktig lerret, så en
+ * deaktivert kilde forsvinner i stedet for å stoppe hele grafen. Tall, 3D og
+ * andre verdier blir borte, slik at en deaktivert kilde ikke styrer noe.
+ */
+function bypassOutputs(
+  def: NodeDefinition,
+  inputs: InputValues,
+  ctx: EvalContext,
+): Outputs {
+  const result: Outputs = {}
+
+  for (const out of def.outputs) {
+    const candidates = def.inputs.filter((port) => canPass(port.type, out.type))
+    const port =
+      candidates.find((p) => p.id === 'in') ??
+      candidates.find((p) => p.id === 'base') ??
+      candidates[0]
+    if (!port) continue
+
+    const raw = inputs[port.id]
+    const value = port.multiple && Array.isArray(raw) ? raw[raw.length - 1] : raw
+    if (value !== undefined) {
+      result[out.id] = value
+      continue
+    }
+
+    if (out.type === 'canvas' || out.type === 'drawable') {
+      const target = ctx.render.canvas(`${ctx.scopeKey}:bypass`)
+      target.ctx.clearRect(0, 0, target.width, target.height)
+      result[out.id] = target.canvas
+    }
+  }
+
+  return result
 }
 
 function clampToParam(value: number, def?: ParamDef): number {

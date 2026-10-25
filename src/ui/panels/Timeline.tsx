@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { nodeParamDefs } from '../../engine/graph'
+import { EASING_OPTIONS } from '../../engine/animation/keyframes'
+import type { Keyframe, KeyframeEasing } from '../../engine/types'
 import { useGraphStore } from '../../state/useGraphStore'
 import { usePlaybackStore } from '../../state/usePlaybackStore'
 
@@ -7,14 +10,26 @@ interface Track {
   nodeTitle: string
   path: string
   label: string
-  frames: number[]
+  keys: Keyframe[]
+}
+
+interface SelectedKey {
+  nodeId: string
+  path: string
+  frame: number
+}
+
+function easingLabel(value: Keyframe['interpolation'] | undefined): string {
+  return EASING_OPTIONS.find((option) => option.value === (value ?? 'linear'))?.label ?? 'Lineær'
 }
 
 /** Samler alle spor (node + parameter) som har keyframes. */
 export function Timeline() {
   const graph = useGraphStore((s) => s.graph)
   const setKeyframe = useGraphStore((s) => s.setKeyframe)
+  const setKeyframeEasing = useGraphStore((s) => s.setKeyframeEasing)
   const removeKeyframe = useGraphStore((s) => s.removeKeyframe)
+  const [selectedKey, setSelectedKey] = useState<SelectedKey | null>(null)
   const seek = usePlaybackStore((s) => s.seek)
   const toggle = usePlaybackStore((s) => s.toggle)
   const isPlaying = usePlaybackStore((s) => s.isPlaying)
@@ -34,7 +49,7 @@ export function Timeline() {
         nodeTitle: node.title,
         path,
         label: param?.label ?? path,
-        frames: keys.map((k) => k.frame),
+        keys,
       })
     }
   }
@@ -124,27 +139,72 @@ export function Timeline() {
                 {track.nodeTitle} <span className="text-zinc-500">· {track.label}</span>
               </span>
               <span className="shrink-0 whitespace-nowrap text-[10px] tabular-nums text-zinc-600">
-                {track.frames.length} nøkkel
+                {track.keys.length} nøkkel
               </span>
             </div>
 
             <div className="relative mt-1 h-4 overflow-hidden rounded bg-zinc-900">
-              {track.frames.map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  title={`Frame ${f} — klikk for å hoppe, dobbeltklikk for å slette`}
-                  onClick={() => seek(f)}
-                  onDoubleClick={() => removeKeyframe(track.nodeId, track.path, f)}
-                  className="absolute top-0.5 h-3 w-1.5 -translate-x-1/2 rounded-sm bg-amber-400 hover:bg-amber-500"
-                  style={{ left: `${(f / Math.max(1, frames - 1)) * 100}%` }}
-                />
-              ))}
+              {track.keys.map((key) => {
+                const selected =
+                  selectedKey?.nodeId === track.nodeId &&
+                  selectedKey.path === track.path &&
+                  selectedKey.frame === key.frame
+                return (
+                  <button
+                    key={key.frame}
+                    type="button"
+                    title={`Frame ${key.frame} — ${easingLabel(key.interpolation)}. Klikk for å hoppe, dobbeltklikk for å slette`}
+                    onClick={() => {
+                      seek(key.frame)
+                      setSelectedKey({ nodeId: track.nodeId, path: track.path, frame: key.frame })
+                    }}
+                    onDoubleClick={() => {
+                      removeKeyframe(track.nodeId, track.path, key.frame)
+                      if (selected) setSelectedKey(null)
+                    }}
+                    className={`absolute top-0.5 h-3 w-1.5 -translate-x-1/2 rounded-sm hover:bg-amber-500 ${
+                      selected ? 'bg-lime-400 ring-1 ring-lime-200' : 'bg-amber-400'
+                    }`}
+                    style={{ left: `${(key.frame / Math.max(1, frames - 1)) * 100}%` }}
+                  />
+                )
+              })}
               <div
                 className="pointer-events-none absolute top-0 h-4 w-px bg-lime-400"
                 style={{ left: `${(frame / Math.max(1, frames - 1)) * 100}%` }}
               />
             </div>
+
+            {(() => {
+              const selected =
+                selectedKey?.nodeId === track.nodeId && selectedKey.path === track.path
+                  ? track.keys.find((key) => key.frame === selectedKey.frame)
+                  : undefined
+              if (!selected || !selectedKey) return null
+              return (
+                <label className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-500">
+                  Overgang fra frame {selected.frame}
+                  <select
+                    value={selected.interpolation ?? 'linear'}
+                    onChange={(event) =>
+                      setKeyframeEasing(
+                        track.nodeId,
+                        track.path,
+                        selected.frame,
+                        event.target.value as KeyframeEasing,
+                      )
+                    }
+                    className="rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-[10px] text-zinc-200"
+                  >
+                    {EASING_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )
+            })()}
           </div>
         ))}
       </div>

@@ -197,7 +197,7 @@ export function rekeySubgraph(group: Subgraph, prefix: string): Subgraph {
 }
 
 /** Flytter `params.layers`-nøkler over til nye kant-ID-er. */
-function remapLayerKeys(
+export function remapLayerKeys(
   params: Record<string, unknown>,
   edgeIdMap: Map<string, string>,
 ): Record<string, unknown> {

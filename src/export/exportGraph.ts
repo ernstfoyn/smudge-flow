@@ -11,6 +11,12 @@ export interface ExportOptions {
   outputNodeId: NodeId
   canvas: HTMLCanvasElement
   prefer?: OutputFormat
+  /** Lydsporet som skal muxes inn. Utelates for stille video. */
+  audio?: {
+    assetId?: string
+    src?: string
+    loop?: boolean
+  }
   onProgress?: (progress: number, frame: number, total: number) => void
   signal?: AbortSignal
   /**
@@ -39,11 +45,20 @@ export async function exportGraph(options: ExportOptions): Promise<EncodeResult>
 
   const ctx = canvas.getContext('2d')!
 
+  let audioBuffer: AudioBuffer | undefined
+  if (options.audio && options.render) {
+    const { assetId, src } = options.audio
+    const url = assetId ? await options.render.assets.resolveAsset(assetId) : src
+    if (url) audioBuffer = await options.render.assets.audio(url)
+  }
+
   return encodeFrames({
     canvas,
     fps,
     frames,
     prefer: options.prefer,
+    audio: audioBuffer,
+    audioLoop: options.audio?.loop ?? true,
     signal: options.signal,
     onProgress: options.onProgress,
     render: async (frame) => {

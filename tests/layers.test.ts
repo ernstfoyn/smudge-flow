@@ -138,3 +138,32 @@ describe('rekeySubgraph', () => {
     expect(layers[copy.edges[0].id].mode).toBe('multiply')
   })
 })
+
+describe('rekkefølge på lag', () => {
+  it('flytter en kabel opp eller ned i lagstabelen', () => {
+    const node = (id: string, x: number) => ({
+      id, type: 'source.gradient', title: id, params: {}, tracks: {}, lfo: {}, position: { x, y: 0 },
+    })
+    const edge = (id: string, source: string) => ({
+      id, source, sourcePort: 'out', target: 'stack', targetPort: 'in',
+    })
+    const graph: Graph = {
+      version: 1,
+      settings: { width: 10, height: 10, fps: 30, frames: 60, loop: true, background: '#000' },
+      nodes: [
+        node('a', 0), node('b', 100), node('c', 200),
+        { id: 'stack', type: 'composite.stack', title: 'Lagstabel', params: {}, tracks: {}, lfo: {}, position: { x: 300, y: 0 } },
+      ],
+      edges: [edge('e1', 'a'), edge('e2', 'b'), edge('e3', 'c')],
+    }
+    useGraphStore.getState().setGraph(graph)
+    const order = () =>
+      useGraphStore.getState().graph.edges.filter((e) => e.target === 'stack').map((e) => e.id)
+
+    expect(order()).toEqual(['e1', 'e2', 'e3'])
+    useGraphStore.getState().reorderInput('stack', 'in', 0, 2)
+    expect(order()).toEqual(['e2', 'e3', 'e1'])
+    useGraphStore.getState().reorderInput('stack', 'in', 2, 1)
+    expect(order()).toEqual(['e2', 'e1', 'e3'])
+  })
+})

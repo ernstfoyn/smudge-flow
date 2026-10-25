@@ -12,6 +12,7 @@ const CATEGORY_STYLE: Record<string, string> = {
   source: 'border-cyan-500/60 text-cyan-300',
   curve: 'border-blue-400/60 text-blue-300',
   modifier: 'border-fuchsia-500/60 text-fuchsia-300',
+  mask: 'border-teal-400/60 text-teal-300',
   composite: 'border-amber-500/60 text-amber-300',
   output: 'border-lime-500/60 text-lime-300',
 }
@@ -109,8 +110,10 @@ export function NodeCard({ id, selected }: NodeProps) {
   const select = useGraphStore((s) => s.select)
   const drag = useConnectionDrag((s) => s.drag)
   const [showAllParams, setShowAllParams] = useState(false)
+  const [fileOver, setFileOver] = useState(false)
 
   if (!node) return null
+  const acceptsMedia = node.type === 'source.image'
 
   const isGroup = node.type === 'group'
   const ports = isGroup
@@ -205,9 +208,20 @@ export function NodeCard({ id, selected }: NodeProps) {
   return (
     <div
       onClick={() => select(id)}
+      onDragOver={
+        acceptsMedia
+          ? (event) => {
+              if (!event.dataTransfer.types.includes('Files')) return
+              event.preventDefault()
+              setFileOver(true)
+            }
+          : undefined
+      }
+      onDragLeave={acceptsMedia ? () => setFileOver(false) : undefined}
+      onDrop={acceptsMedia ? () => setFileOver(false) : undefined}
       className={`w-[232px] rounded-xl border bg-zinc-900/95 shadow-xl backdrop-blur transition ${
         selected ? 'border-lime-400/80 ring-1 ring-lime-400/40' : 'border-zinc-700/70'
-      } ${
+      } ${fileOver ? 'border-lime-400 ring-2 ring-lime-400/40' : ''} ${
         node.enabled === false ? 'opacity-50' : dimmed ? 'opacity-45 saturate-50' : ''
       }`}
     >
@@ -220,6 +234,14 @@ export function NodeCard({ id, selected }: NodeProps) {
             />
           )}
           <span className="truncate text-[12px] font-semibold text-zinc-100">{node.title}</span>
+          {node.enabled === false && (
+            <span
+              title="Noden er deaktivert og sluses forbi. Kablene er beholdt."
+              className="shrink-0 rounded bg-zinc-700/60 px-1 text-[9px] uppercase tracking-wide text-zinc-300"
+            >
+              forbi
+            </span>
+          )}
           {isGroup && (
             <span className="shrink-0 rounded bg-violet-500/15 px-1 text-[9px] text-violet-300">
               {node.group?.nodes.length ?? 0} noder

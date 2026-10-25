@@ -95,14 +95,23 @@ export interface ParamDef {
   showWhen?: { key: string; in: Array<string | number> }
 }
 
+export type KeyframeEasing =
+  | 'linear'
+  | 'hold'
+  | 'ease-in'
+  | 'ease-out'
+  | 'ease-in-out'
+  | 'bounce'
+  | 'elastic'
+
 export interface Keyframe {
   frame: number
   value: unknown
   /**
-   * Interpolasjonen tilhører den UTGÅENDE keyframen, slik som i Orbit.
-   * Gir rom for bezier/hold senere uten at rendereren endres.
+   * Overgangen tilhører den UTGÅENDE keyframen, slik som i Orbit.
+   * Gjelder fram til neste keyframe.
    */
-  interpolation?: 'linear' | 'hold'
+  interpolation?: KeyframeEasing
 }
 
 export interface LfoConfig {
@@ -257,6 +266,10 @@ export interface RenderServices {
     image(src: string): Promise<HTMLImageElement>
     /** Deterministisk: seeker og venter på 'seeked' per frame. */
     videoFrame(src: string, time: number): Promise<HTMLVideoElement>
+    /** Slår opp en fil i den lokale filbanken og gir en blob-URL. */
+    resolveAsset(id: string): Promise<string>
+    /** Dekoder en lydfil fra en URL eller blob-URL. Caches per kilde. */
+    audio(src: string): Promise<AudioBuffer>
   }
   dispose(): void
 }
@@ -311,7 +324,7 @@ export type Outputs = Record<string, unknown>
 export interface NodeDefinition<P = Record<string, unknown>> {
   type: string
   label: string
-  category: 'source' | 'curve' | 'modifier' | 'composite' | 'output'
+  category: 'source' | 'curve' | 'modifier' | 'mask' | 'composite' | 'output'
   /** Kort forklaring som vises i paletten og i noden. */
   description?: string
   /** Skjules i paletten og søk, men virker i eksisterende grafer. */

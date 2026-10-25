@@ -15,6 +15,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { useGraphStore } from '../state/useGraphStore'
 import { useThemeStore } from '../state/useThemeStore'
+import { isMediaFile, mediaParamsFromAsset, putAsset } from '../assets/media'
 import { useConnectionDrag } from '../state/useConnectionDrag'
 import {
   PARAM_PORT_PREFIX,
@@ -27,7 +28,7 @@ import { NodeCard } from './nodes/NodeCard'
 import { NodeTabMenu } from './NodeTabMenu'
 import { PortLegend } from './PortLegend'
 import { PARAM_META, portMeta } from './portStyle'
-import type { NodeDefinition } from '../engine/types'
+import type { NodeDefinition, NodeId } from '../engine/types'
 
 const nodeTypes = { card: NodeCard }
 
@@ -67,10 +68,34 @@ function FlowInner() {
   const reactFlow = useReactFlow()
 
   const hostRef = useRef<HTMLDivElement>(null)
+  /** Startposisjonene når brukeren Alt-drar: da skal originalen bli stående. */
+  const altDragRef = useRef<{ starts: Record<NodeId, { x: number; y: number }> } | null>(null)
+  /** Alt-tasten holdes nede. Fanges opp, slik at draget ikke er avhengig av musens event. */
+  const altKeyRef = useRef(false)
   const pointerRef = useRef<{ x: number; y: number } | null>(null)
   const [menu, setMenu] = useState<MenuAnchor | null>(null)
 
   useEffect(() => () => useConnectionDrag.getState().end(), [])
+
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => {
+      if (event.key === 'Alt') altKeyRef.current = true
+    }
+    const up = (event: KeyboardEvent) => {
+      if (event.key === 'Alt') altKeyRef.current = false
+    }
+    const clear = () => {
+      altKeyRef.current = false
+    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', clear)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', clear)
+    }
+  }, [])
 
   const nodes: Node[] = useMemo(
     () =>
@@ -280,11 +305,42 @@ function FlowInner() {
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
+      if (event.defaultPrevented) return
       event.preventDefault()
-      const type = event.dataTransfer.getData('application/smudge-node')
-      if (!type) return
       const position = reactFlow.screenToFlowPosition({ x: event.clientX, y: event.clientY })
-      addNode(type, position)
+
+      const type = event.dataTransfer.getData('application/smudge-node')
+      if (type) {
+        addNode(type, position)
+        return
+      }
+
+      const file = Array.from(event.dataTransfer.files).find(isMediaFile)
+      if (!file) return
+
+      const targetElement = (event.target as HTMLElement | null)?.closest('.react-flow__node')
+      const targetId = targetElement?.getAttribute('data-id')
+      const targetNode = targetId
+        ? useGraphStore.getState().graph.nodes.find((n) => n.id === targetId)
+        : undefined
+
+      // Slippes filen oppå en Bilde/video-node, byttes filen på den noden.
+      // På andre noder skjer ingenting; slipp på lerretet i stedet.
+      let id: NodeId | null
+      if (targetNode) {
+        if (targetNode.type !== 'source.image') return
+        id = targetNode.id
+      } else {
+        id = addNode('source.image', position)
+      }
+      if (!id) return
+      void putAsset(file)
+        .then((asset) => useGraphStore.getState().setParams(id, mediaParamsFromAsset(asset)))
+        .catch((err) =>
+          useGraphStore.setState({
+            notice: (err as Error)?.message ?? 'Kunne ikke lagre filen.',
+          }),
+        )
     },
     [addNode, reactFlow],
   )
@@ -382,6 +438,168 @@ function FlowInner() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  /** Grafposisjonen under musepekeren, når den er over lerretet. */
+  const positionAtPointer = useCallback((): { x: number; y: number } | undefined => {
+    const pointer = pointerRef.current
+    const host = hostRef.current
+    if (!pointer || !host) return undefined
+    const rect = host.getBoundingClientRect()
+    const inside =
+      pointer.x >= rect.left && pointer.x <= rect.right &&
+      pointer.y >= rect.top && pointer.y <= rect.bottom
+    return inside ? reactFlow.screenToFlowPosition(pointer) : undefined
+  }, [reactFlow])
+
+  /**
+   * P forhåndsviser valgt node; P igjen (eller Escape) går tilbake til Viewport.
+   * Ignoreres når en dialog er åpen eller brukeren skriver i et felt.
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (document.querySelector('[role="dialog"]')) return
+
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
+
+      const state = useGraphStore.getState()
+      if (event.key.toLowerCase() === 'p') {
+        event.preventDefault()
+        if (!state.selection.length) {
+          state.clearPreview()
+          return
+        }
+        state.togglePreviewNode(state.selection[state.selection.length - 1])
+        return
+      }
+      if (event.key === 'Escape' && state.preview) {
+        event.preventDefault()
+        state.clearPreview()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  /**
+   * Kopier og dupliser. Cmd/Ctrl + C / D.
+   * Lim inn håndteres av «paste»-hendelsen lenger ned.
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return
+
+      const key = event.key.toLowerCase()
+      if (key !== 'c' && key !== 'd') return
+
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
+
+      const state = useGraphStore.getState()
+      if (key === 'c') {
+        if (!state.selection.length) return
+        event.preventDefault()
+        state.copySelection()
+        return
+      }
+      if (!state.selection.length) return
+      event.preventDefault()
+      state.duplicateSelection()
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  /**
+   * Lim inn: bilde/video fra systemets utklippstavle, eller noder som er
+   * kopiert i appen. Vi bruker «paste»-hendelsen, fordi nettleseren bare
+   * gir tilgang til filer der.
+   */
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      if (document.querySelector('[role="dialog"]')) return
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
+
+      const data = event.clipboardData
+      if (!data) return
+
+      const files = Array.from(data.files)
+      if (!files.length) {
+        for (const item of Array.from(data.items ?? [])) {
+          if (item.kind !== 'file') continue
+          const file = item.getAsFile()
+          if (file) files.push(file)
+        }
+      }
+      const media = files.find(isMediaFile)
+      if (media) {
+        event.preventDefault()
+        const id = useGraphStore
+          .getState()
+          .addNode('source.image', positionAtPointer() ?? { x: 120, y: 120 })
+        if (!id) return
+        void putAsset(media)
+          .then((asset) => useGraphStore.getState().setParams(id, mediaParamsFromAsset(asset)))
+          .catch((err) =>
+            useGraphStore.setState({
+              notice: (err as Error)?.message ?? 'Kunne ikke lagre filen.',
+            }),
+          )
+        return
+      }
+
+      if (useGraphStore.getState().hasClipboard()) {
+        event.preventDefault()
+        useGraphStore.getState().pasteClipboard(positionAtPointer())
+      }
+    }
+
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [positionAtPointer])
+
+  /**
+   * Alt/Option + dra: kopien havner der du slipper, og originalen blir stående.
+   * Vi venter til draget er ferdig, fordi React Flow da har sluttposisjonen.
+   */
+  const onNodeDragStart = useCallback((event: MouseEvent | TouchEvent, node: Node) => {
+    const alt = (event instanceof MouseEvent && event.altKey) || altKeyRef.current
+    if (!alt) {
+      altDragRef.current = null
+      return
+    }
+    const state = useGraphStore.getState()
+    const ids = state.selection.includes(node.id) ? state.selection : [node.id]
+    const starts: Record<NodeId, { x: number; y: number }> = {}
+    for (const id of ids) {
+      const current = state.graph.nodes.find((n) => n.id === id)
+      if (current) starts[id] = { ...current.position }
+    }
+    altDragRef.current = { starts }
+  }, [])
+
+  const onNodeDragStop = useCallback(() => {
+    const drag = altDragRef.current
+    altDragRef.current = null
+    if (!drag) return
+
+    const state = useGraphStore.getState()
+    const moved = Object.entries(drag.starts).some(([id, start]) => {
+      const node = state.graph.nodes.find((n) => n.id === id)
+      return node && (Math.abs(node.position.x - start.x) > 2 || Math.abs(node.position.y - start.y) > 2)
+    })
+    if (!moved) return
+    state.duplicateSelection({ x: 0, y: 0 }, drag.starts)
+  }, [])
+
   return (
     <div
       ref={hostRef}
@@ -401,6 +619,8 @@ function FlowInner() {
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}

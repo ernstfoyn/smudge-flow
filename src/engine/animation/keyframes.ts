@@ -1,4 +1,4 @@
-import type { Keyframe } from '../types'
+import type { Keyframe, KeyframeEasing } from '../types'
 
 type AnyRecord = Record<string, any>
 
@@ -25,8 +25,15 @@ function mix(a: unknown, b: unknown, t: number): unknown {
     /^#[0-9a-f]{6}$/i.test(b)
   ) {
     const channels = [1, 3, 5].map((i) =>
-      Math.round(
-        parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t,
+      Math.min(
+        255,
+        Math.max(
+          0,
+          Math.round(
+            parseInt(a.slice(i, i + 2), 16) * (1 - t) +
+              parseInt(b.slice(i, i + 2), 16) * t,
+          ),
+        ),
       ),
     )
     return '#' + channels.map((v) => v.toString(16).padStart(2, '0')).join('')
@@ -35,10 +42,67 @@ function mix(a: unknown, b: unknown, t: number): unknown {
   return t < 1 ? a : b
 }
 
-const interpolators: Record<string, (a: unknown, b: unknown, t: number) => unknown> = {
-  linear: mix,
-  hold: (a: unknown, b: unknown, t: number) => (t < 1 ? a : b),
+function easeIn(t: number): number {
+  return t * t * t
 }
+
+function easeOut(t: number): number {
+  return 1 - (1 - t) ** 3
+}
+
+function easeInOut(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+}
+
+function outBounce(t: number): number {
+  const n = 7.5625
+  const d = 2.75
+  if (t < 1 / d) return n * t * t
+  if (t < 2 / d) {
+    const u = t - 1.5 / d
+    return n * u * u + 0.75
+  }
+  if (t < 2.5 / d) {
+    const u = t - 2.25 / d
+    return n * u * u + 0.9375
+  }
+  const u = t - 2.625 / d
+  return n * u * u + 0.984375
+}
+
+function outElastic(t: number): number {
+  if (t === 0 || t === 1) return t
+  const c = (2 * Math.PI) / 3
+  return 2 ** (-10 * t) * Math.sin((t * 10 - 0.75) * c) + 1
+}
+
+/** Overgangskurvene brukerne kan velge per keyframe. */
+export const EASINGS: Record<KeyframeEasing, (t: number) => number> = {
+  linear: (t) => t,
+  hold: (t) => (t < 1 ? 0 : 1),
+  'ease-in': easeIn,
+  'ease-out': easeOut,
+  'ease-in-out': easeInOut,
+  bounce: outBounce,
+  elastic: outElastic,
+}
+
+export const EASING_OPTIONS: Array<{ value: KeyframeEasing; label: string }> = [
+  { value: 'linear', label: 'Lineær' },
+  { value: 'hold', label: 'Hold (hopp)' },
+  { value: 'ease-in', label: 'Myk start' },
+  { value: 'ease-out', label: 'Myk slutt' },
+  { value: 'ease-in-out', label: 'Myk start og slutt' },
+  { value: 'bounce', label: 'Sprett' },
+  { value: 'elastic', label: 'Elastisk' },
+]
+
+const interpolators = Object.fromEntries(
+  Object.entries(EASINGS).map(([name, easing]) => [
+    name,
+    (a: unknown, b: unknown, t: number) => mix(a, b, easing(t)),
+  ]),
+) as Record<string, (a: unknown, b: unknown, t: number) => unknown>
 
 /**
  * Verdien til et spor på en gitt frame.
@@ -69,10 +133,11 @@ export function upsertKey(
   keys: Keyframe[],
   frame: number,
   value: unknown,
-  interpolation: Keyframe['interpolation'] = 'linear',
+  interpolation?: Keyframe['interpolation'],
 ): Keyframe[] {
+  const existing = keys.find((k) => k.frame === frame)
   const next = keys.filter((k) => k.frame !== frame)
-  next.push({ frame, value, interpolation })
+  next.push({ frame, value, interpolation: interpolation ?? existing?.interpolation ?? 'linear' })
   return next.sort((a, b) => a.frame - b.frame)
 }
 

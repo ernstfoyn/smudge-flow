@@ -13,6 +13,12 @@ function fakeRender(): RenderServices {
       throw new Error('Ikke støttet i test')
     },
     assets: {
+      resolveAsset: async () => {
+        throw new Error('Ikke støttet i test')
+      },
+      audio: async () => {
+        throw new Error('Ikke støttet i test')
+      },
       image: async () => {
         throw new Error('Ikke støttet i test')
       },
@@ -96,6 +102,25 @@ describe('Evaluator', () => {
     const a = await evaluator.evaluateFrame(graph, 7, ['snk'])
     const b = await evaluator.evaluateFrame(graph, 7, ['snk'])
     expect(a.get('snk')?.value).toBe(b.get('snk')?.value)
+  })
+
+  it('sluser en deaktivert node forbi uten å koble den fra', async () => {
+    const evaluator = new Evaluator(registry, fakeRender())
+    const graph = buildGraph()
+    graph.nodes[1].enabled = false
+    const out = await evaluator.evaluateFrame(graph, 0, ['snk'])
+    expect(out.get('snk')?.value).toBe(5)
+    expect(graph.edges).toHaveLength(2)
+  })
+
+  it('evaluerer noden normalt igjen når den aktiveres', async () => {
+    const evaluator = new Evaluator(registry, fakeRender())
+    const graph = buildGraph()
+    graph.nodes[1].enabled = false
+    await evaluator.evaluateFrame(graph, 0, ['snk'])
+    graph.nodes[1].enabled = true
+    const out = await evaluator.evaluateFrame(graph, 0, ['snk'])
+    expect(out.get('snk')?.value).toBe(15)
   })
 
   it('bruker keyframes i evalueringen', async () => {

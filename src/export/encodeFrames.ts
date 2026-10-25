@@ -25,6 +25,10 @@ export interface EncodeOptions {
   /** Tegner den gitte rammen. Må vente på ferdigstillelse. */
   render: (frame: number) => Promise<void> | void
   prefer?: OutputFormat
+  /** Dekodet lyd som skal muxes inn i videoen. */
+  audio?: AudioBuffer | null
+  /** Gjenta lyden hvis den er kortere enn videoen. */
+  audioLoop?: boolean
   onProgress?: (progress: number, frame: number, total: number) => void
   signal?: AbortSignal
 }
@@ -35,6 +39,8 @@ export interface EncodeResult {
   fps: number
   frames: number
   duration: number
+  /** Ble lydsporet faktisk kodet inn? */
+  audioIncluded: boolean
 }
 
 export async function encodeFrames({
@@ -43,6 +49,8 @@ export async function encodeFrames({
   frames,
   render,
   prefer = 'mp4',
+  audio,
+  audioLoop = true,
   onProgress,
   signal,
 }: EncodeOptions): Promise<EncodeResult> {
@@ -96,12 +104,59 @@ export async function encodeFrames({
     )
   }
 
+  const duration = total / rate
+  const audioQuality = new B.Quality({ bitrate: 128_000 })
+  const canAac = audio
+    ? await B.canEncodeAudio('aac', {
+        numberOfChannels: audio.numberOfChannels,
+        sampleRate: audio.sampleRate,
+        quality: audioQuality,
+      })
+    : false
+  const canOpus = audio
+    ? await B.canEncodeAudio('opus', {
+        numberOfChannels: audio.numberOfChannels,
+        sampleRate: audio.sampleRate,
+        quality: audioQuality,
+      })
+    : false
+  const canVorbis = audio
+    ? await B.canEncodeAudio('vorbis', {
+        numberOfChannels: audio.numberOfChannels,
+        sampleRate: audio.sampleRate,
+        quality: audioQuality,
+      })
+    : false
+
+  const audioCodec =
+    extension === 'mp4'
+      ? canAac
+        ? 'aac'
+        : canOpus
+          ? 'opus'
+          : null
+      : canOpus
+        ? 'opus'
+        : canVorbis
+          ? 'vorbis'
+          : canAac
+            ? 'aac'
+            : null
+
   const output = new B.Output({ format, target: new B.BufferTarget() })
   const source = new B.CanvasSource(canvas, { codec, quality, latencyMode: 'realtime' })
   output.addVideoTrack(source, { frameRate: rate })
 
+  const audioSource =
+    audio && audioCodec ? new B.AudioBufferSource({ codec: audioCodec, quality: audioQuality }) : null
+  if (audioSource) output.addAudioTrack(audioSource)
+
   try {
     await output.start()
+
+    if (audioSource && audio) {
+      await audioSource.add(fitAudio(audio, duration, audioLoop))
+    }
 
     for (let frame = 0; frame < total; frame++) {
       if (signal?.aborted) throw new DOMException('Avbrutt', 'AbortError')
@@ -123,10 +178,38 @@ export async function encodeFrames({
       extension,
       fps: rate,
       frames: total,
-      duration: total / rate,
+      duration,
+      audioIncluded: !!audioSource,
     }
   } catch (error) {
     await output.cancel().catch(() => {})
     throw error
   }
+}
+
+/**
+ * Tilpasser lyden til videoens nøyaktige lengde.
+ *
+ * Kortere lyd kan loopes eller fylles med stillhet. Lengre lyd kuttes, slik
+ * at lydsporet aldri gjør videoen lengre enn frames / fps.
+ */
+function fitAudio(source: AudioBuffer, duration: number, loop: boolean): AudioBuffer {
+  const length = Math.max(1, Math.round(duration * source.sampleRate))
+  if (source.length === length) return source
+
+  const target = new AudioBuffer({
+    length,
+    numberOfChannels: source.numberOfChannels,
+    sampleRate: source.sampleRate,
+  })
+  for (let ch = 0; ch < source.numberOfChannels; ch++) {
+    const from = source.getChannelData(ch)
+    const to = target.getChannelData(ch)
+    for (let i = 0; i < length; i++) {
+      if (i < from.length) to[i] = from[i]
+      else if (loop && from.length > 0) to[i] = from[i % from.length]
+      else to[i] = 0
+    }
+  }
+  return target
 }

@@ -57,11 +57,13 @@ describe('topoSort', () => {
     expect(first).toEqual(second)
   })
 
-  it('hopper over deaktiverte noder', () => {
+  it('beholder deaktiverte noder i kjeden, så de kan sluses forbi', () => {
     const g = graph()
     g.nodes[1].enabled = false
-    const { order } = topoSort(g, ['d'])
-    expect(order).not.toContain('b')
+    const { order, errors } = topoSort(g, ['d'])
+    expect(errors).toEqual([])
+    expect(order).toContain('b')
+    expect(order.indexOf('b')).toBeLessThan(order.indexOf('c'))
   })
 })
 

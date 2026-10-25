@@ -1,5 +1,6 @@
 import type { CanvasTarget, PostOptions, RenderServices } from '../engine/types'
 import type { PostProcess } from './three/postProcess'
+import { getAssetUrl } from '../assets/media'
 
 /**
  * Eneste sted som eier DOM/canvas-ressurser.
@@ -11,6 +12,8 @@ export class BrowserRenderServices implements RenderServices {
   private canvases = new Map<string, CanvasTarget>()
   private images = new Map<string, Promise<HTMLImageElement>>()
   private videos = new Map<string, HTMLVideoElement>()
+  private audioBuffers = new Map<string, Promise<AudioBuffer>>()
+  private audioContext: AudioContext | null = null
   /** Versjon per lerret — brukes til memo i motoren. */
   private versions = new WeakMap<object, number>()
   /** Delt GPU-kontekst for alle postprosesseringer. */
@@ -57,6 +60,21 @@ export class BrowserRenderServices implements RenderServices {
   }
 
   assets = {
+    resolveAsset: (id: string): Promise<string> => getAssetUrl(id),
+    audio: (src: string): Promise<AudioBuffer> => {
+      if (!src) return Promise.reject(new Error('Ingen lydkilde valgt.'))
+      let pending = this.audioBuffers.get(src)
+      if (!pending) {
+        pending = (async () => {
+          const response = await fetch(src)
+          const bytes = await response.arrayBuffer()
+          if (!this.audioContext) this.audioContext = new AudioContext()
+          return this.audioContext.decodeAudioData(bytes)
+        })()
+        this.audioBuffers.set(src, pending)
+      }
+      return pending
+    },
     image: (src: string): Promise<HTMLImageElement> => {
       if (!src) return Promise.reject(new Error('Ingen bildekilde valgt.'))
       let pending = this.images.get(src)
@@ -128,5 +146,14 @@ export class BrowserRenderServices implements RenderServices {
     this.canvases.clear()
     this.postProcess?.dispose()
     this.postProcess = null
+  }
+
+  disposeAll(): void {
+    this.dispose()
+    this.images.clear()
+    this.videos.clear()
+    this.audioBuffers.clear()
+    void this.audioContext?.close().catch(() => {})
+    this.audioContext = null
   }
 }

@@ -23,6 +23,7 @@ export interface MediaBunnyApi {
   Output: new (options: { format: unknown; target: { buffer: ArrayBuffer } }) => {
     target: { buffer: ArrayBuffer }
     addVideoTrack(source: unknown, options?: { frameRate?: number }): void
+    addAudioTrack(source: unknown, options?: Record<string, unknown>): void
     start(): Promise<void>
     finalize(): Promise<void>
     cancel(): Promise<void>
@@ -31,4 +32,20 @@ export interface MediaBunnyApi {
     codec: string,
     options: { width: number; height: number; frameRate: number; quality: MediaBunnyQuality },
   ): Promise<boolean>
+  canEncodeAudio(
+    codec: string,
+    options: {
+      numberOfChannels: number
+      sampleRate: number
+      bitrate?: number
+      quality?: MediaBunnyQuality
+    },
+  ): Promise<boolean>
+  AudioBufferSource: new (config: {
+    codec: string
+    bitrate?: number
+    quality?: MediaBunnyQuality
+  }) => {
+    add(audioBuffer: AudioBuffer): Promise<void>
+  }
 }

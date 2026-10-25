@@ -17,6 +17,12 @@ function fakeRender(): RenderServices {
       throw new Error('Ikke støttet i test')
     },
     assets: {
+      resolveAsset: async () => {
+        throw new Error('Ikke støttet i test')
+      },
+      audio: async () => {
+        throw new Error('Ikke støttet i test')
+      },
       image: async () => {
         throw new Error('Ikke støttet i test')
       },
