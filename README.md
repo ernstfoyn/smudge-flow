@@ -72,7 +72,9 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `modifier.displace` | modifikator | Ny — forskyv bildet med et kart |
 | `modifier.echo` | modifikator | Ny — etterslep fra tidligere frames |
 | `modifier.pattern` | modifikator | Ny — fragmentert prisme fra patternable |
+| `modifier.gradientMap` | modifikator | Ny — flerfarge-gradient på objekt eller gruppe |
 | `source.audio` | kilde | Ny — lydfil med nivå, bass, mellomtone og diskant |
+| `source.kineticText` | kilde | Ny — tekst på ringer rundt en sylinder, inspirert av Space Type Generator |
 | `curve.signal` | signal | Ny — en kurve (sinus, trekant, støy, tegnet …) med hastighet og fase. Kobles til «Styring» på en node |
 | `source.loop` | signal (skjult) | Ny — eldre alt-i-ett loop-generator, brukt av blokkene |
 | `value.math` | signal | Ny — regn på to tall/signaler: legg sammen, multipliser, min/maks, potens, modulo, avrunding |
@@ -105,7 +107,11 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 
 `composite.blend` har to innganger: **Bunn** og **Topp**. For flere lag bruker
 du **Lagstabel** (`composite.stack`): koble så mange kilder du vil inn i samme
-port «Lag». Lag 1 er bunnen, resten blandes oppå.
+port «Lag». Lag 1 er toppen; radene under ligger bak. Standardmodus er
+`normal`, slik at rekkefølgen faktisk påvirker resultatet. Moduser som `screen`,
+`multiply`, `lighten`, `darken`, `difference` og `add` er rekkefølge-uavhengige;
+appen viser et varsel når alle lag bruker en slik modus. Bruk `normal` og
+100 % dekkevne når 3D-objekter skal være helt ugjennomsiktige.
 
 Hvert lag har **egen** blandemodus, dekkevne og synlighet — det er laglisten
 i komposisjonen. Rekkefølgen endres med ↑/↓, og øyet skjuler et lag uten å
@@ -170,7 +176,9 @@ løkke. Nå er de delt:
 
 **Rekkefølgen bestemmes av kantene i grafen.** Koble Kromatisk før VHS, så
 får du VHS-en på det kromatisk-splittede bildet — og bytter du om, får du
-det andre resultatet.
+det andre resultatet. Look-effektene bevarer alfa fra inputen, så de kan
+ligge over gradienter og andre lag i en Lagstabel uten å gjøre bakgrunnen
+ugjennomsiktig.
 
 ---
 
@@ -234,7 +242,8 @@ til på nytt.
 `source.text2D` tegner tekst på et gjennomsiktig lerret, med font, størrelse,
 vekt, farge, justering og linjeavstand. `source.shape2D` tegner rektangel,
 ellipse, trekant, diamant, stjerne eller polygon med fyll, kant og rotasjon.
-Begge følger grafens oppløsning og kan blandes med bilder i en Lagstabel.
+Begge har **Universell skala**, som skalerer tekststørrelse eller bredde/høyde
+samlet. De følger grafens oppløsning og kan blandes med bilder i en Lagstabel.
 
 ### Masker og matte
 
@@ -252,6 +261,64 @@ Vanlig kjede:
 2D-tekst ─▶ Bruk maske ─▶ Lagstabel ─▶ Viewport
 Fasongmaske ─▶ Maske
 ```
+
+### Gradienter
+
+`source.gradient` bruker nå en ekte **flerfargestopp-editor**. Klikk direkte på
+gradientstripen for å legge til et fargestopp der du klikker, eller bruk
+«+ Farge». Du kan ha opptil åtte farger, flytte dem langs skalaen, velge farge
+og justere mykheten mellom nabofargene. Dette er en videreføring av
+gradientmotoren fra Orbit.
+
+`modifier.gradientMap` legger en flerfarge-gradient på et objekt eller en
+gruppe:
+
+- **Fyll formen (alfa)** fyller silhuetten med gradienten.
+- **Map lysstyrke** mapper gråtoner og 3D-scener gjennom gradientskalaen.
+
+Koble for eksempel en 3D-scene, en Lagstabel eller en gruppe inn i Gradient map,
+og deretter videre til Viewport.
+
+### Fonter
+
+**2D-tekst** har et bredt utvalg systemfonter: System, Arial, Helvetica, Verdana,
+Trebuchet, Gill Sans, Georgia, Times, Palatino, Courier og Impact.
+
+**3D-tekst** har egne typeface-fonter med full ÆØÅ-dekning:
+
+- Droid Sans, Droid Sans Fet og Droid Sans Mono (Apache 2.0)
+- Droid Serif og Droid Serif Fet (Apache 2.0)
+- Gentilis og Gentilis Fet (MgOpen)
+
+Fontene ligger i `src/assets/`. Når fonten endres, bygges 3D-geometrien på nytt.
+Lisensene ligger ved siden av fontfilene.
+
+### Lagstabel og grener
+
+Hver rad i lagstabelen representerer hele grenen som mater laget, ikke bare
+den siste noden. Er det en effekt mellom kilden og lagstabelen, viser raden
+både effekten og kjeden bak, for eksempel «Raster» med «Gradient → Raster».
+Hele grenen flyttes samlet med pilene eller ved å dra i håndtaket.
+
+Du kan sette inn en node midt på en kobling på tre måter: velg koblingen og
+trykk **Tab**, dobbeltklikk koblingen, eller hold **Shift** mens du drar en node
+fra paletten og slipper den på koblingen.
+
+### Kinetic type
+
+`source.kineticText` setter tekst på ringer rundt en sylinder, inspirert av
+[Space Type Generator](https://spacetypegenerator.com/). Den gir et 3D-objekt
+som kobles til 3D-scene.
+
+Parametere: tekst, font, variant, bokstavstørrelse, tykkelse, antall ringer,
+ringradius, ringavstand, rotasjon per loop, forskyvning per ring, bølger per
+loop, bølgeutslag og vertikal strekk. Rotasjon og bølger bruker heltallige
+sykluser, slik at loopen lukker seg eksakt. Materialet kan være standard,
+wireframe eller normaler.
+
+Varianter: Cylinder, Field, Stripes, Coil, Flag, Morisawa, Cascade, Ribbon,
+Layers, Danger, String, Badge, Clutter, Construct, Snap, Flash, Pow, Crash,
+Crash Clock, Vessel, Shine, Boost og BoxSquad.
 
 ### Fragmentprisme
 

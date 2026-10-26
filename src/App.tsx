@@ -11,6 +11,7 @@ import { useElementSize, usePanelLayout } from './ui/usePanelLayout'
 import { useGraphStore } from './state/useGraphStore'
 import { useThemeStore } from './state/useThemeStore'
 import { useHelpStore, hasSeenHelp } from './state/useHelpStore'
+import { useEditorStore } from './state/useEditorStore'
 import { HelpDialog } from './ui/HelpDialog'
 import { usePlaybackStore } from './state/usePlaybackStore'
 import { serializeGraph, deserializeGraph } from './engine/graph'
@@ -24,6 +25,7 @@ export default function App() {
   const graph = useGraphStore((s) => s.graph)
   const setGraph = useGraphStore((s) => s.setGraph)
   const reset = useGraphStore((s) => s.reset)
+  const requestLayout = useEditorStore((s) => s.requestLayout)
   const notice = useGraphStore((s) => s.notice)
   const clearNotice = useGraphStore((s) => s.clearNotice)
   const toggle = usePlaybackStore((s) => s.toggle)
@@ -158,6 +160,14 @@ export default function App() {
           </button>
           <button
             type="button"
+            onClick={requestLayout}
+            className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+            title="Legg nodene i tydelige kolonner"
+          >
+            Rydd opp
+          </button>
+          <button
+            type="button"
             onClick={reset}
             className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1 text-[11px] text-zinc-400 hover:bg-zinc-800"
           >
@@ -185,7 +195,7 @@ export default function App() {
       <div ref={workspaceRef} className="flex min-h-0 flex-1 overflow-hidden">
         {/* Venstre: palett + inspector */}
         <aside
-          className="flex min-w-0 shrink-0 flex-col bg-zinc-950"
+          className="flex min-w-0 shrink-0 flex-col bg-[var(--panel-bg)]"
           style={{ width: layout.left }}
         >
           <nav className="flex border-b border-zinc-800">
@@ -245,7 +255,7 @@ export default function App() {
           />
 
           <section
-            className="flex min-h-0 shrink-0 flex-col overflow-hidden"
+            className="flex min-h-0 shrink-0 flex-col overflow-hidden bg-[var(--panel-bg)]"
             style={{ height: layout.bottom }}
           >
             <nav className="flex shrink-0 items-center gap-1 border-b border-zinc-800 bg-zinc-900/40 px-3 py-1.5">
@@ -289,7 +299,7 @@ export default function App() {
 
         {/* Høyre: preview */}
         <aside
-          className="flex min-w-0 shrink-0 flex-col bg-zinc-950"
+          className="flex min-w-0 shrink-0 flex-col bg-[var(--panel-bg)]"
           style={{ width: layout.right }}
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-900/40 px-3 py-2">

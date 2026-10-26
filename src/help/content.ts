@@ -88,7 +88,9 @@ export const HELP_TOPICS: HelpTopic[] = [
           'Forhåndsvisningen til høyre: resultatet akkurat nå. Ser du en rød boks der, mangler en node en påkrevd inngang.',
           'Se en bestemt node: marker den og trykk P. Da vises nodens bilde og alt som ligger foran den, uten at den må kobles til Viewport. P igjen eller Escape går tilbake.',
           'Skillelinjene mellom panelene kan dras for å endre størrelse. Dobbeltklikk for å gå tilbake til standard.',
-          'Lagstabel: rekkefølgen på lagene endres med pilene, eller ved å dra i ⠿ på hver rad i Egenskaper. Lag 1 er bunnen.',
+          'Lagstabel: hver rad er hele grenen som mater laget, ikke bare den siste noden. Kjedet vises under navnet, og hele grenen flyttes med pilene eller ved å dra i ⠿. Lag 1 er toppen; radene under ligger bak.',
+          'Lagstabelens standardmodus er normal. Moduser som screen, multiply, lighten, darken, difference og add gir samme resultat uansett rekkefølge. Appen varsler når alle lag bruker en slik modus. Bruk normal og 100 % dekkevne når 3D-objekter skal være helt ugjennomsiktige.',
+          'Look-effekter som VHS og Duotone bevarer gjennomsiktigheten. Derfor kan de ligge over en gradient i en Lagstabel uten å skjule laget under.',
         ],
       },
     ],
@@ -107,6 +109,7 @@ export const HELP_TOPICS: HelpTopic[] = [
           'Flytte node: dra den i lerretet.',
           'Flere noder: Shift-klikk for å markere flere, og dra dem sammen. Delete fjerner alle markerte.',
           'Kopiere: Cmd/Ctrl + C, og lim inn med Cmd/Ctrl + V. Kopien havner ved musepekeren om den er over lerretet. Cmd/Ctrl + D dupliserer med en gang. Alt/Option + dra lager også en kopi der du slipper, mens originalen blir stående.',
+          'Sette inn på en kobling: velg koblingen og trykk Tab, eller dobbeltklikk koblingen. Du kan også holde Shift mens du drar en node fra paletten og slipper den på koblingen. Da settes den inn og kobles automatisk.',
           'Løkker: en kabel som ville sendt verdien tilbake til en node tidligere i kjeden, avvises. En graf kan forgrene seg og slå sammen igjen, men den kan ikke gå i ring.',
         ],
       },
@@ -214,7 +217,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       {
         type: 'ul',
         items: [
-          '2D-tekst: skriv teksten, velg font, størrelse, vekt og farge. X og Y plasserer teksten; 0,5 er midten.',
+          '2D-tekst: skriv teksten, velg font, størrelse, vekt og farge. X og Y plasserer teksten; 0,5 er midten. Fontvelgeren har systemfonter som Arial, Georgia, Times, Courier og flere.',
+          '2D-tekst og 2D-fasong har «Universell skala», som skalerer tekststørrelse eller bredde og høyde samlet. Bruk den når hele objektet skal større eller mindre.',
           'Linjeavstand og dekkevne kan animeres med keyframes eller signaler.',
           '2D-fasong: velg rektangel, ellipse, trekant, diamant, stjerne eller polygon. Bredde og høyde er andeler av lerretet.',
           'Rotasjon, fyll, kant og kantbredde kan justeres. Polygon bruker «Kanter»; stjernen bruker «Indre radius».',
@@ -247,6 +251,80 @@ export const HELP_TOPICS: HelpTopic[] = [
       {
         type: 'tip',
         text: 'I Eksport velger du hvilket lydspor som skal legges i videoen. MP4 bruker AAC når nettleseren støtter det, ellers Opus. WebM bruker Opus eller Vorbis. Bruk en lav analysevindu-verdi for raske slag, og en høyere verdi for jevnere bevegelse.',
+      },
+    ],
+  },
+  {
+    id: 'gradienter',
+    title: 'Gradienter',
+    summary: 'Flere farger på samme skala.',
+    blocks: [
+      {
+        type: 'p',
+        text: 'Gradienter kan ha opptil åtte fargestopp. Hvert stopp har farge, posisjon og mykhet, slik at du kan lage gradienter med mange farger og myke eller harde overganger.',
+      },
+      {
+        type: 'ul',
+        items: [
+          'Gradientkilden har en egen fargestopp-editor. Klikk direkte på gradientstripen for å legge til et fargestopp der du klikker, eller bruk «+ Farge». Dra i posisjonen og juster mykheten.',
+          'Gradient map fargelegger et objekt eller en gruppe. «Fyll formen» bruker silhuetten, mens «Map lysstyrke» mapper gråtoner gjennom gradienten.',
+          'Koble en 3D-scene, en gruppe eller en Lagstabel inn i Gradient map for å fargelegge hele resultatet.',
+          'Fargevandring og tetthet kan animeres med keyframes eller signaler.',
+        ],
+      },
+      {
+        type: 'tip',
+        text: 'Bruk «Fyll formen» når du vil ha rene fargeflater på en logo eller en tekst. Bruk «Map lysstyrke» når du vil beholde skygger og detaljer fra et bilde eller en 3D-scene.',
+      },
+    ],
+  },
+  {
+    id: 'fonter',
+    title: 'Fonter',
+    summary: 'Velg skrift i 2D og 3D.',
+    blocks: [
+      {
+        type: 'p',
+        text: '2D-tekst og 3D-tekst har hver sin fontvelger. 2D bruker systemfonter som følger maskinen. 3D bruker innebygde typeface-fonter, fordi teksten skal ekstruderes til ekte geometri.',
+      },
+      {
+        type: 'ul',
+        items: [
+          '2D-tekst: System, Arial, Helvetica, Verdana, Trebuchet, Gill Sans, Georgia, Times, Palatino, Courier og Impact.',
+          '3D-tekst: Droid Sans, Droid Sans Fet, Droid Sans Mono, Droid Serif, Droid Serif Fet, Gentilis og Gentilis Fet.',
+          'Alle 3D-fontene dekker ÆØÅæøå, så norsk tekst blir riktig.',
+          'Bytter du font på 3D-tekst, bygges geometrien på nytt automatisk.',
+        ],
+      },
+      {
+        type: 'tip',
+        text: '2D-tekst er raskest og egner seg for titler og undertekster. 3D-tekst gir ekte dybde, skygger og materialer, men koster mer å bygge.',
+      },
+    ],
+  },
+  {
+    id: 'kinetic-type',
+    title: 'Kinetic type',
+    summary: 'Tekst i ringer rundt en sylinder.',
+    blocks: [
+      {
+        type: 'p',
+        text: 'Kinetic type er inspirert av Space Type Generator. Teksten legges som bokstaver på ringer rundt en sylinder, og kan rotere, bølge og strekkes i 3D.',
+      },
+      {
+        type: 'ul',
+        items: [
+          'Skriv teksten og velg variant: Cylinder, Field, Stripes, Coil, Flag, Cascade, Ribbon, Layers, Badge, Crash, BoxSquad og flere.',
+          'Skriv teksten og velg font. Bokstavstørrelse, tykkelse og kurver styrer geometrien.',
+          'Ringer og ringavstand bestemmer hvor mange nivåer teksten ligger på og hvor høyt de står.',
+          'Rotasjon per loop og bølger per loop er heltall, så animasjonen lukker seg uten hopp.',
+          'Bølgeutslag og vertikal strekk lager den organiske bevegelsen.',
+          'Bruk wireframe for en grafisk kontur-look, eller standard for et fysisk materiale.',
+        ],
+      },
+      {
+        type: 'tip',
+        text: 'Koble Kinetic type til 3D-scene, og deretter til Viewport eller en Lagstabel. Bruk en 3D-transform etter noden hvis hele teksten skal flyttes eller roteres.',
       },
     ],
   },
@@ -328,7 +406,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       },
       {
         type: 'tip',
-        text: 'Viewporten kan bli tregere med 3D-scener. Den viser da alltid det siste ferdige bildet, og oppdateres så snart neste er klart.',
+        text: 'Viewporten kan bli tregere med 3D-scener. Den viser da alltid det siste ferdige bildet, og oppdateres så snart neste er klart. Skal 3D-objektet være helt ugjennomsiktig i en Lagstabel, bruk normal blandemodus og 100 % dekkevne.',
       },
       { type: 'example', id: '3d-scene' },
       { type: 'example', id: 'blob' },
@@ -360,7 +438,8 @@ export const HELP_TOPICS: HelpTopic[] = [
         type: 'keys',
         items: [
           { keys: '?', does: 'Åpne eller lukk denne hjelpen.' },
-          { keys: 'Tab', does: 'Legg til en node. Skriv navnet og trykk Enter.' },
+          { keys: 'Tab', does: 'Legg til en node. Er én kobling valgt, settes noden inn på den.' },
+          { keys: 'Shift + dra', does: 'Dra en node fra paletten til en kobling for å sette den inn der.' },
           { keys: 'Delete / Backspace', does: 'Slett markerte noder og koblinger.' },
           { keys: 'Cmd/Ctrl + C', does: 'Kopier markerte noder med kablene mellom dem.' },
           { keys: 'Cmd/Ctrl + V', does: 'Lim inn kopierte noder ved musepekeren, eller et bilde fra utklippstavlen.' },

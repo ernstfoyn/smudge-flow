@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { registry } from '../../nodes'
 import type { Graph, GraphNode } from '../../engine/types'
 import { nodeParamDefs, nodePorts } from '../../engine/graph'
+import { branchSummary } from '../../engine/branch'
 import {
   SIGNAL_NODE_TYPE,
   drivableParams,
@@ -11,6 +12,7 @@ import {
 import { isPreviewableType } from '../../engine/preview'
 import { CurveEditor } from './CurveEditor'
 import { MediaSourceField } from './MediaSourceField'
+import { GradientEditor } from './GradientEditor'
 import { AudioSourceField } from './AudioSourceField'
 import { HelpLink } from '../primitives/HelpLink'
 import { useGraphStore } from '../../state/useGraphStore'
@@ -231,6 +233,10 @@ export function Inspector() {
       !(
         (node.type === 'source.image' || node.type === 'source.audio') &&
         p.key === 'src'
+      ) &&
+      !(
+        node.type === 'source.gradient' &&
+        (p.key === 'colorA' || p.key === 'colorB')
       ) &&
       isParamVisible(p, node.params),
   )
@@ -564,6 +570,15 @@ export function Inspector() {
       {layerPorts.map((port) => {
         const edges = graph.edges.filter((e) => e.target === node.id && e.targetPort === port.id)
         const layersParam = params.find((p) => p.type === 'layers')
+        // Lagstabelen viser topplaget først, som i bilde- og videoprogrammer.
+        // Motoren tegner kantene i rekkefølge fra bunn til topp.
+        const reverseLayers = layersParam ? Boolean(node.params.reverse) : false
+        const displayEdges = layersParam && !reverseLayers ? [...edges].reverse() : edges
+        const moveLayer = (fromEdgeId: string, toEdgeId: string) => {
+          const from = edges.findIndex((edge) => edge.id === fromEdgeId)
+          const to = edges.findIndex((edge) => edge.id === toEdgeId)
+          if (from >= 0 && to >= 0) reorderInput(node.id, port.id, from, to)
+        }
         const settingsFor = (edgeId: string) => {
           const layers = (node.params[layersParam?.key ?? ''] ?? {}) as Record<
             string,
@@ -576,6 +591,14 @@ export function Inspector() {
             visible: own?.visible ?? true,
           }
         }
+        const orderingHasNoEffect =
+          !!layersParam &&
+          edges.length > 1 &&
+          edges.every((edge) =>
+            ['screen', 'multiply', 'lighten', 'darken', 'difference', 'add'].includes(
+              settingsFor(edge.id).mode,
+            ),
+          )
 
         return (
           <CollapsibleSection
@@ -590,10 +613,35 @@ export function Inspector() {
               <p className="text-[11px] text-zinc-600">Ingen lag koblet ennå.</p>
             )}
 
+            {orderingHasNoEffect && (
+              <div className="mb-1.5 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] leading-relaxed text-amber-300">
+                <p>
+                  Alle lag bruker en blandemodus der rekkefølgen ikke påvirker resultatet.
+                  Velg «normal» for å stable dem, og 100 % dekkevne for at de skal være ugjennomsiktige.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    for (const edge of edges) {
+                      setLayerSetting(node.id, edge.id, {
+                        mode: 'normal',
+                        opacity: 1,
+                        visible: true,
+                      })
+                    }
+                  }}
+                  className="mt-1 rounded border border-amber-400/60 px-2 py-0.5 text-[10px] font-medium text-amber-200 hover:bg-amber-500/15"
+                >
+                  Bruk normal · 100 %
+                </button>
+              </div>
+            )}
+
             <ol className="flex flex-col gap-1">
-              {edges.map((edge, index) => {
+              {displayEdges.map((edge, index) => {
                 const source = graph.nodes.find((n) => n.id === edge.source)
                 const settings = settingsFor(edge.id)
+                const branch = branchSummary(graph, edge.source)
 
                 return (
                   <li
@@ -605,14 +653,11 @@ export function Inspector() {
                       }
                     }}
                     onDrop={(event) => {
-                      const raw = event.dataTransfer.getData('application/x-smudge-layer')
-                      if (!raw) return
+                      const fromEdgeId = event.dataTransfer.getData('application/x-smudge-layer')
+                      if (!fromEdgeId || fromEdgeId === edge.id) return
                       event.preventDefault()
                       event.stopPropagation()
-                      const from = Number(raw)
-                      if (Number.isInteger(from) && from !== index) {
-                        reorderInput(node.id, port.id, from, index)
-                      }
+                      moveLayer(fromEdgeId, edge.id)
                     }}
                     className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1"
                   >
@@ -622,7 +667,7 @@ export function Inspector() {
                         title="Dra for å endre rekkefølgen"
                         aria-label="Dra for å endre rekkefølgen"
                         onDragStart={(event) => {
-                          event.dataTransfer.setData('application/x-smudge-layer', String(index))
+                          event.dataTransfer.setData('application/x-smudge-layer', edge.id)
                           event.dataTransfer.effectAllowed = 'move'
                         }}
                         className="cursor-grab select-none px-0.5 text-[11px] text-zinc-600 hover:text-zinc-300 active:cursor-grabbing"
@@ -632,13 +677,31 @@ export function Inspector() {
                       <span className="w-4 text-[10px] tabular-nums text-zinc-600">
                         {index + 1}
                       </span>
-                      <span
-                        className={`min-w-0 flex-1 truncate text-[11px] ${
-                          settings.visible ? 'text-zinc-300' : 'text-zinc-600 line-through'
-                        }`}
-                      >
-                        {source?.title ?? edge.source}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span
+                            className={`min-w-0 truncate text-[11px] ${
+                              settings.visible ? 'text-zinc-300' : 'text-zinc-600 line-through'
+                            }`}
+                            title={`Hele grenen: ${branch.label}`}
+                          >
+                            {source?.title ?? edge.source}
+                          </span>
+                          {branch.count > 1 && (
+                            <span className="shrink-0 rounded bg-zinc-800 px-1 text-[9px] tabular-nums text-zinc-500">
+                              {branch.count} noder
+                            </span>
+                          )}
+                        </div>
+                        {branch.count > 1 && (
+                          <div
+                            className="truncate text-[9px] text-zinc-600"
+                            title={branch.label}
+                          >
+                            {branch.label}
+                          </div>
+                        )}
+                      </div>
                       {layersParam && (
                         <button
                           type="button"
@@ -657,18 +720,18 @@ export function Inspector() {
                       )}
                       <button
                         type="button"
-                        title="Flytt opp"
+                        title="Flytt hele grenen opp"
                         disabled={index === 0}
-                        onClick={() => reorderInput(node.id, port.id, index, index - 1)}
+                        onClick={() => moveLayer(edge.id, displayEdges[index - 1].id)}
                         className="rounded px-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-25"
                       >
                         ↑
                       </button>
                       <button
                         type="button"
-                        title="Flytt ned"
-                        disabled={index === edges.length - 1}
-                        onClick={() => reorderInput(node.id, port.id, index, index + 1)}
+                        title="Flytt hele grenen ned"
+                        disabled={index === displayEdges.length - 1}
+                        onClick={() => moveLayer(edge.id, displayEdges[index + 1].id)}
                         className="rounded px-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-25"
                       >
                         ↓
@@ -726,7 +789,7 @@ export function Inspector() {
 
             <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
               {layersParam
-                ? 'Lag 1 er bunnen. Dra i ⠿ (eller bruk pilene) for å endre rekkefølgen. Hvert lag har egen modus, dekkevne og synlighet.'
+                ? 'Lag 1 er toppen, altså det som ligger øverst i bildet. Hver rad er hele grenen som mater laget. Dra i ⠿ eller bruk pilene for å flytte grenen. Hvert lag har egen modus, dekkevne og synlighet.'
                 : 'Rekkefølgen er uten betydning for 3D (dybden avgjør), men brukes av gruppen.'}
             </p>
           </CollapsibleSection>
@@ -847,7 +910,28 @@ export function Inspector() {
               <div key={p.key} className="flex min-w-0 flex-col gap-1.5">
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="min-w-0 flex-1">
-                    {p.type === 'file' ? (
+                    {p.type === 'gradient' ? (
+                      <GradientEditor
+                        value={value}
+                        fallback={
+                          node.type === 'source.gradient'
+                            ? [
+                                {
+                                  position: 0,
+                                  color: String(node.params.colorA ?? '#b9ff66'),
+                                  softness: 1,
+                                },
+                                {
+                                  position: 1,
+                                  color: String(node.params.colorB ?? '#4bdac5'),
+                                  softness: 1,
+                                },
+                              ]
+                            : []
+                        }
+                        onChange={(stops) => setParam(node.id, p.key, stops)}
+                      />
+                    ) : p.type === 'file' ? (
                       <FileField
                         label={p.label}
                         value={String(value ?? '')}

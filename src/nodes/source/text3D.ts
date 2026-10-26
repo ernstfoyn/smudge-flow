@@ -1,9 +1,11 @@
 import type { BufferGeometry } from 'three'
 import type { NodeDefinition } from '../../engine/types'
 import { identityTransform, type Object3DValue, type ShadingMode } from '../../render/three/object3d'
+import { TEXT3D_FONTS } from '../../render/three/textFonts'
 
 export interface Text3DParams {
   text: string
+  font: string
   size: number
   depth: number
   segments: number
@@ -35,6 +37,10 @@ export const text3D: NodeDefinition<Text3DParams> = {
   outputs: [{ id: 'out', label: 'Objekt', type: 'object3d' }],
   params: [
     { key: 'text', label: 'Tekst', type: 'text', default: 'SMUDGE' },
+    {
+      key: 'font', label: 'Font', type: 'enum', default: 'droid-sans-regular',
+      options: TEXT3D_FONTS.map((font) => ({ value: font.value, label: font.label })),
+    },
     { key: 'size', label: 'Størrelse', type: 'number', default: 0.5, min: 0.05, max: 3, step: 0.01 },
     { key: 'depth', label: 'Tykkelse', type: 'number', default: 0.16, min: 0, max: 1, step: 0.01 },
     { key: 'segments', label: 'Kurver', type: 'int', default: 6, min: 1, max: 24 },
@@ -59,14 +65,15 @@ export const text3D: NodeDefinition<Text3DParams> = {
     const size = Number(p.size)
     const depth = Number(p.depth)
     const segments = Math.round(Number(p.segments))
-    const cacheKey = `${text}:${size}:${depth}:${segments}`
+    const font = String(p.font ?? 'droid-sans-regular')
+    const cacheKey = `${text}:${font}:${size}:${depth}:${segments}`
 
     let geometry = ctx.nodeCache.get('geometry') as BufferGeometry | undefined
     const cachedKey = ctx.nodeCache.get('geometryKey') as string | undefined
 
     if (!geometry || cachedKey !== cacheKey) {
       geometry?.dispose()
-      geometry = await buildTextGeometry({ text, size, depth, segments })
+      geometry = await buildTextGeometry({ text, font, size, depth, segments })
       ctx.nodeCache.set('geometry', geometry)
       ctx.nodeCache.set('geometryKey', cacheKey)
     }

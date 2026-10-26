@@ -10,6 +10,7 @@ import { objSource } from './source/objSource'
 import { text2D } from './source/text2D'
 import { shape2D } from './source/shape2D'
 import { audioSource } from './source/audio'
+import { kineticText } from './source/kineticText'
 import { noise } from './source/noise'
 import { voronoi } from './source/voronoi'
 import { curveNodes } from './curve/curves'
@@ -42,6 +43,7 @@ import { maskCombine } from './mask/maskCombine'
 import { fitNode } from './modifier/fit'
 import { displaceNode } from './modifier/displace'
 import { echoNode } from './modifier/echo'
+import { gradientMap } from './modifier/gradientMap'
 import { patternNode } from './modifier/pattern'
 import { imageSwitchNode } from './composite/imageSwitch'
 import { exportOutput, viewport } from './output/outputs'
@@ -64,6 +66,7 @@ export const registry = new NodeRegistry().registerAll([
   text2D,
   shape2D,
   audioSource,
+  kineticText,
   noise,
   voronoi,
   // Signaler — kurver, matematikk og velgere
@@ -91,6 +94,7 @@ export const registry = new NodeRegistry().registerAll([
   fitNode,
   displaceNode,
   echoNode,
+  gradientMap,
   patternNode,
   shader,
   // Masker

@@ -340,6 +340,36 @@ Opus/Vorbis i WebM. `encodeFrames` bruker MediaBunny `AudioBufferSource` og
 `addAudioTrack`; resultatet melder `audioIncluded` slik at UI-et kan vise om
 lyden faktisk kom med.
 
+### Look-effekter og alfa
+
+Postprosesseringen kjører med alfakanal, og look-shaderen skriver
+`vec4(col, source.a)` i stedet for en fast alfa på 1. Da bevarer VHS, Duotone,
+Blur og de andre effektene gjennomsiktigheten fra inputen, og et lag med en
+effekt kan ligge over en gradient i Lagstabelen uten å skjule den.
+
+### Gradienter
+
+Gradientmotoren i `src/engine/color/gradient.ts` støtter opptil åtte fargestopp
+med posisjon, farge og mykhet, og er en port av Orbit sin GradientRamp.
+`source.gradient` bruker `stops`-parameteren når den har innhold; ellers faller
+den tilbake til `colorA`/`colorB`, så eldre grafer virker som før. I UI-et kan
+brukeren klikke direkte på gradientstripen for å legge til et stopp på den
+posisjonen, med en interpolert farge.
+
+`modifier.gradientMap` bruker samme stoppliste. I `alpha`-modus tegnes inputen
+og fylles med gradienten via `source-in`, så silhuetten og gjennomsiktigheten
+beholdes. I `luminance`-modus bygges en 256-trinns LUT fra gradienten, og hver
+piksel mappes etter lysstyrke. Begge virker på lerret, bilde, video, grupper og
+3D-scene-raster.
+
+### Fonter
+
+2D-tekst bruker CSS-fontstakker og systemfonter, slik at den følger maskinen.
+3D-tekst bruker typeface-JSON med `TextGeometry`, fordi ekstrudering krever
+vektorkonturer. Alle 3D-fontene i `src/assets/` dekker ÆØÅæøå. De lastes og
+parses én gang per font og caches; geometrien bygges på nytt når tekst, font,
+størrelse, tykkelse eller kurver endres.
+
 ### Fragmentprisme
 
 `modifier.pattern` er en Canvas 2D-port av patternable fra
@@ -348,6 +378,15 @@ det inn i hvert rutenett, klippet og forskjøvet etter kolonne og rad. `grid`
 tegner hele rutenettet; `echo` tegner midtrad, midtkolonne og diagonale kopier.
 Squeeze, kompresjon, rotasjon og per-rute jitter følger den opprinnelige
 mekanikken. Parametrene er animerbare og erstatter appens egne kurvevalg.
+
+### Kinetic type
+
+`source.kineticText` bygger et 3D-objekt med én tekstmesh per bokstav og rad.
+Geometrien caches per bokstav/font/størrelse/tykkelse, mens posisjon, rotasjon
+og strekk regnes ut fra `ctx.phase`. `spin` og `waveCycles` er heltall, så
+fase 0 og fase 1 gir samme transform. Variantene (Cylinder, Field, Stripes,
+Coil, Flag, Cascade, Ribbon, Layers, Badge, Crash, BoxSquad med flere) er
+layoutfunksjoner over samme bokstavgeometri. Inspirert av Space Type Generator.
 
 ### Bildeverktøy
 
@@ -359,6 +398,18 @@ mekanikken. Parametrene er animerbare og erstatter appens egne kurvevalg.
 Begge tegner inputen inn i grafens oppløsning, så de virker for lerret, bilde
 og video. `displace` er implementert på CPU og er derfor deterministisk og lik
 i preview og eksport.
+
+### Lagstabel og grener
+
+Hver rad i lagstabelen representerer en hel gren, ikke bare noden som er koblet
+direkte til laget. `upstreamBranch()` i `src/engine/branch.ts` følger
+verdikoblingene bakover og gir både antall noder og en kort kjede, for eksempel
+«Gradient → Raster». Motoren tegner kantene fra bunn til topp, men panelet viser
+**topplaget først**. Når en rad flyttes, flyttes hele grenen. Standard
+blandemodus er `normal`. Kommutative moduser som `screen`, `multiply`,
+`lighten`, `darken`, `difference` og `add` gir samme resultat uansett
+rekkefølge, og panelet varsler når alle lag bruker en av dem. `normal` med
+100 % dekkevne gir ugjennomsiktige lag, som er nødvendig for solide 3D-objekter.
 
 ### Parameter-koblinger
 

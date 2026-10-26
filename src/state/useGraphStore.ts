@@ -45,6 +45,17 @@ interface GraphState {
 
   setGraph: (graph: Graph) => void
   addNode: (type: string, position: { x: number; y: number }) => NodeId | null
+  /** Setter nye posisjoner for flere noder samtidig (auto-layout). */
+  setNodePositions: (positions: Record<NodeId, { x: number; y: number }>) => void
+  /**
+   * Setter en ny node inn midt på en verdikobling. Den originale koblingen
+   * erstattes av kilde → ny node → mål, med kompatible porter.
+   */
+  insertNodeOnEdge: (
+    edgeId: string,
+    type: string,
+    position?: { x: number; y: number },
+  ) => NodeId | null
   removeNode: (id: NodeId) => void
   moveNode: (id: NodeId, position: { x: number; y: number }) => void
   renameNode: (id: NodeId, title: string) => void
@@ -241,6 +252,9 @@ const history = new EditHistory(80)
 /** True mens en historikkoppføring settes i grafen (skal ikke registreres). */
 let applyingHistory = false
 
+/** Etiketten til neste historikkinnslag, når en handling vil ha en egen tekst. */
+let pendingHistory: { label: string; key?: string } | null = null
+
 /**
  * Beskriver hva som endret seg, slik at historikken får gode etiketter
  * og raske endringer kan slås sammen.
@@ -307,6 +321,91 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const id = nextId(type)
     const node = makeNode(type, id, position)
     set((s) => ({ graph: { ...s.graph, nodes: [...s.graph.nodes, node] }, selected: id }))
+    return id
+  },
+
+  setNodePositions: (positions) => {
+    pendingHistory = { label: 'Ryddet opp i nodene', key: 'auto-layout' }
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: s.graph.nodes.map((node) =>
+          positions[node.id] ? { ...node, position: positions[node.id] } : node,
+        ),
+      },
+      notice: 'Ryddet opp i nodene.',
+    }))
+  },
+
+  insertNodeOnEdge: (edgeId, type, position) => {
+    const { graph } = get()
+    if (!registry.has(type)) return null
+
+    const edge = graph.edges.find((item) => item.id === edgeId)
+    if (!edge) return null
+    if (edge.kind === 'param' || edge.kind === 'drive') {
+      set({
+        notice:
+          'Kan bare sette inn en node på en vanlig verdikobling, ikke på en parameter- eller styringskobling.',
+      })
+      return null
+    }
+
+    const sourceNode = graph.nodes.find((node) => node.id === edge.source)
+    const targetNode = graph.nodes.find((node) => node.id === edge.target)
+    if (!sourceNode || !targetNode) return null
+
+    const sourcePort = nodePorts(sourceNode).outputs.find((port) => port.id === edge.sourcePort)
+    const targetPort = nodePorts(targetNode).inputs.find((port) => port.id === edge.targetPort)
+    if (!sourcePort || !targetPort) return null
+
+    const def = registry.get(type)
+    const inputs = def.inputs.filter((port) => canConnectTypes(sourcePort.type, port.type))
+    const outputs = def.outputs.filter((port) => canConnectTypes(port.type, targetPort.type))
+    const input = inputs.find((port) => port.id === 'in') ?? inputs[0]
+    const output = outputs.find((port) => port.id === 'out') ?? outputs[0]
+    if (!input || !output) {
+      set({
+        notice: `«${def.label}» har ingen kompatible innganger og utganger for denne koblingen.`,
+      })
+      return null
+    }
+
+    const id = nextId(type)
+    const node = makeNode(type, id, position ?? {
+      x: (sourceNode.position.x + targetNode.position.x) / 2,
+      y: (sourceNode.position.y + targetNode.position.y) / 2,
+    })
+
+    const inEdge: GraphEdge = {
+      id: `${edge.source}.${edge.sourcePort}->${id}.${input.id}`,
+      source: edge.source,
+      sourcePort: edge.sourcePort,
+      target: id,
+      targetPort: input.id,
+    }
+    const outEdge: GraphEdge = {
+      id: `${id}.${output.id}->${edge.target}.${edge.targetPort}`,
+      source: id,
+      sourcePort: output.id,
+      target: edge.target,
+      targetPort: edge.targetPort,
+    }
+
+    pendingHistory = { label: `Satte inn «${def.label}» på kobling`, key: 'insert-on-edge' }
+    set({
+      graph: {
+        ...graph,
+        nodes: [...graph.nodes, node],
+        edges: graph.edges.flatMap((item) =>
+          item.id === edge.id ? [inEdge, outEdge] : [item],
+        ),
+      },
+      selected: id,
+      selection: [id],
+      selectedEdges: [],
+      notice: `Satte inn «${def.label}» mellom «${sourceNode.title}» og «${targetNode.title}».`,
+    })
     return id
   },
 
@@ -1182,7 +1281,9 @@ useGraphStore.subscribe((state, prev) => {
   if (state.graph === prev.graph) return
   if (applyingHistory) return
 
-  const change = describeChange(prev.graph, state.graph)
+  const override = pendingHistory
+  pendingHistory = null
+  const change = override ?? describeChange(prev.graph, state.graph)
   if (!change) return
 
   history.recordChange(prev.graph, state.graph, change.label, change.key)

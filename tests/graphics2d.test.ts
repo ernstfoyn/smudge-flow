@@ -63,6 +63,7 @@ describe('2D-tekst', () => {
   const params = {
     text: 'Hei\ndu',
     size: 20,
+    scale: 1,
     font: 'ui-sans-serif',
     weight: '700',
     color: '#ff0000',
@@ -85,6 +86,12 @@ describe('2D-tekst', () => {
     expect(props.textAlign).toBe('center')
   })
 
+  it('skalerer tekststørrelsen med Universell skala', () => {
+    const { render, props } = recordingRender()
+    text2D.evaluate(ctx(render), {}, { ...params, scale: 2 })
+    expect(props.font).toBe('700 40px ui-sans-serif')
+  })
+
   it('påvirker bare sitt eget lerret', () => {
     const a = recordingRender()
     const b = recordingRender()
@@ -99,6 +106,7 @@ describe('2D-fasong', () => {
     shape: 'ellipse' as const,
     width: 0.5,
     height: 0.4,
+    scale: 1,
     x: 0.5,
     y: 0.5,
     rotation: 45,
@@ -130,6 +138,13 @@ describe('2D-fasong', () => {
       expect(() => shape2D.evaluate(ctx(render), {}, { ...base, shape })).not.toThrow()
       expect(calls.some((c) => c.name === 'fill')).toBe(true)
     }
+  })
+
+  it('skalerer bredde og høyde samlet', () => {
+    const { render, calls } = recordingRender()
+    shape2D.evaluate(ctx(render), {}, { ...base, scale: 2 })
+    const ellipse = calls.find((c) => c.name === 'ellipse')
+    expect(ellipse?.args.slice(2, 4)).toEqual([100, 40])
   })
 
   it('hopper over kanten når bredden er 0', () => {

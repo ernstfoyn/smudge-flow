@@ -1,17 +1,32 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-zinc-950: #09090b;
-  --color-zinc-900: #101014;
+  --color-zinc-950: #07070a;
+  --color-zinc-900: #191922;
 }
 
 /* Mørkt tema er standard. Variablene under er det som styrer utseendet. */
 :root {
-  --controls-bg: #18181b;
-  --controls-border: #3f3f46;
-  --controls-fill: #a1a1aa;
-  --controls-hover: #27272a;
-  --scrollbar: #3f3f46;
+  /*
+   * Løfter de midterste gråtonene. De brukes mye til hjelpetekst, etiketter
+   * og kanter, og standard zink-500/600 blir for mørke på nesten svart.
+   */
+  --color-zinc-800: #2f2f3b;
+  --color-zinc-700: #565664;
+  --color-zinc-600: #8a8a95;
+  --color-zinc-500: #a0a0ab;
+  --color-zinc-400: #bdbdc8;
+
+  --panel-bg: #13131c;
+  --node-bg: #23232f;
+  --node-header-bg: #2e2e3b;
+  --node-ring: rgba(255, 255, 255, 0.06);
+
+  --controls-bg: #191922;
+  --controls-border: #565664;
+  --controls-fill: #bdbdc8;
+  --controls-hover: #2f2f3b;
+  --scrollbar: #565664;
   --stage-bg: rgba(0, 0, 0, 0.4);
   --stage-badge: rgba(0, 0, 0, 0.6);
 }
@@ -53,6 +68,11 @@
   --color-blue-300: #1d4ed8;
   --color-cyan-300: #0e7490;
   --color-fuchsia-300: #a21caf;
+
+  --panel-bg: #e3e3e8;
+  --node-bg: #fafafa;
+  --node-header-bg: #f2f2f6;
+  --node-ring: rgba(0, 0, 0, 0.05);
 
   --controls-bg: #f6f6f8;
   --controls-border: #c0c0c8;

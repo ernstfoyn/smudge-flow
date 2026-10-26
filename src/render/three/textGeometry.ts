@@ -6,27 +6,38 @@ export interface TextGeometrySpec {
   size: number
   depth: number
   segments: number
+  /** Font-ID fra TEXT3D_FONTS. */
+  font: string
 }
 
-/**
- * Skrifttypen som følger med er Droid Sans. Den ligger i `src/assets`
- * sammen med lisensen, ikke i three-pakken: npm-utgaven av three har ikke
- * eksempelfontene. Droid Sans dekker nordiske tegn (ÆØÅ).
- *
- * Fonten lastes og parses én gang per økt, uansett hvor mange tekstnoder
- * som finnes.
- */
-let fontPromise: Promise<Font> | null = null
+type FontLoaderModule = { default: unknown }
 
-function loadFont(): Promise<Font> {
-  fontPromise ??= (async () => {
+const FONT_LOADERS: Record<string, () => Promise<FontLoaderModule>> = {
+  'droid-sans-regular': () => import('../../assets/droid_sans_regular.typeface.json'),
+  'droid-sans-bold': () => import('../../assets/droid_sans_bold.typeface.json'),
+  'droid-sans-mono-regular': () => import('../../assets/droid_sans_mono_regular.typeface.json'),
+  'droid-serif-regular': () => import('../../assets/droid_serif_regular.typeface.json'),
+  'droid-serif-bold': () => import('../../assets/droid_serif_bold.typeface.json'),
+  'gentilis-regular': () => import('../../assets/gentilis_regular.typeface.json'),
+  'gentilis-bold': () => import('../../assets/gentilis_bold.typeface.json'),
+}
+
+const fontCache = new Map<string, Promise<Font>>()
+
+function loadFont(id: string): Promise<Font> {
+  const key = FONT_LOADERS[id] ? id : 'droid-sans-regular'
+  const existing = fontCache.get(key)
+  if (existing) return existing
+
+  const promise = (async () => {
     const [{ FontLoader }, data] = await Promise.all([
       import('three/examples/jsm/loaders/FontLoader.js'),
-      import('../../assets/droid_sans_regular.typeface.json'),
+      FONT_LOADERS[key](),
     ])
     return new FontLoader().parse(data.default as unknown as FontData)
   })()
-  return fontPromise
+  fontCache.set(key, promise)
+  return promise
 }
 
 /**
@@ -38,7 +49,7 @@ function loadFont(): Promise<Font> {
 export async function buildTextGeometry(spec: TextGeometrySpec): Promise<BufferGeometry> {
   const [{ TextGeometry }, font] = await Promise.all([
     import('three/examples/jsm/geometries/TextGeometry.js'),
-    loadFont(),
+    loadFont(spec.font),
   ])
 
   const geometry = new TextGeometry(spec.text.length > 0 ? spec.text : ' ', {

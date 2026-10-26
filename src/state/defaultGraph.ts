@@ -33,7 +33,7 @@ export function defaultGraph(): Graph {
   }
 
   const stackNode = makeNode('composite.stack', 'stack-1', { x: 420, y: 160 })
-  stackNode.params = { ...stackNode.params, mode: 'screen', opacity: 0.9 }
+  stackNode.params = { ...stackNode.params, mode: 'normal', opacity: 1 }
 
   const out = makeNode('output.viewport', 'out-1', { x: 720, y: 160 })
 

@@ -31,7 +31,7 @@ function context(cache = new Map<string, unknown>()): EvalContext {
 
 describe('source.text3D', () => {
   it('bygger ekstrudert geometri som er sentrert rundt origo', async () => {
-    const geometry = await buildTextGeometry({ text: 'SMUDGE', size: 1, depth: 0.2, segments: 4 })
+    const geometry = await buildTextGeometry({ text: 'SMUDGE', font: 'droid-sans-regular', size: 1, depth: 0.2, segments: 4 })
     geometry.computeBoundingBox()
     const box = geometry.boundingBox!
     const center = {
@@ -49,16 +49,27 @@ describe('source.text3D', () => {
   })
 
   it('gir en tom geometri uten å kaste når teksten er tom', async () => {
-    const geometry = await buildTextGeometry({ text: '', size: 1, depth: 0.2, segments: 4 })
+    const geometry = await buildTextGeometry({ text: '', font: 'droid-sans-regular', size: 1, depth: 0.2, segments: 4 })
     expect(geometry.getAttribute('position')).toBeDefined()
     expect(geometry.getAttribute('position').count).toBe(0)
   })
 
-  it('skrifttypen dekker nordiske tegn', () => {
-    const data = JSON.parse(
-      readFileSync(new URL('../src/assets/droid_sans_regular.typeface.json', import.meta.url), 'utf8'),
-    ) as { glyphs: Record<string, unknown> }
-    for (const char of 'ÆØÅæøå') expect(data.glyphs[char]).toBeDefined()
+  it('alle 3D-fontene dekker nordiske tegn', () => {
+    const files = [
+      'droid_sans_regular',
+      'droid_sans_bold',
+      'droid_sans_mono_regular',
+      'droid_serif_regular',
+      'droid_serif_bold',
+      'gentilis_regular',
+      'gentilis_bold',
+    ]
+    for (const file of files) {
+      const data = JSON.parse(
+        readFileSync(new URL(`../src/assets/${file}.typeface.json`, import.meta.url), 'utf8'),
+      ) as { glyphs: Record<string, unknown> }
+      for (const char of 'ÆØÅæøå') expect(data.glyphs[char], `${file}: ${char}`).toBeDefined()
+    }
   })
 
   it('gjenbruker geometrien mellom frames med samme parametere', async () => {
@@ -68,6 +79,15 @@ describe('source.text3D', () => {
 
     expect(second.out.geometry).toBe(first.out.geometry)
     expect(second.out.shading).toBe('standard')
+  })
+
+  it('bygger ny geometri når fonten endres', async () => {
+    const cache = new Map<string, unknown>()
+    const first = (await text3D.evaluate(context(cache), {}, params({ font: 'droid-sans-regular' }))) as { out: Object3DValue }
+    const second = (await text3D.evaluate(context(cache), {}, params({ font: 'gentilis-bold' }))) as { out: Object3DValue }
+
+    expect(second.out.geometry).not.toBe(first.out.geometry)
+    expect(second.out.geometry!.getAttribute('position').count).toBeGreaterThan(0)
   })
 
   it('bygger ny geometri når teksten endres', async () => {

@@ -84,9 +84,9 @@ export const stack: NodeDefinition<StackParams> = {
   outputs: [{ id: 'out', label: 'Kompositt', type: 'canvas' }],
   params: [
     {
-      key: 'mode', label: 'Standardmodus', type: 'enum', default: 'screen',
+      key: 'mode', label: 'Standardmodus', type: 'enum', default: 'normal',
       options: STACK_MODES.map((m) => ({ value: m, label: m })),    },
-    { key: 'opacity', label: 'Standard dekkevne', type: 'number', default: 0.9, min: 0, max: 1, step: 0.01, animatable: true },
+    { key: 'opacity', label: 'Standard dekkevne', type: 'number', default: 1, min: 0, max: 1, step: 0.01, animatable: true },
     { key: 'reverse', label: 'Reverser rekkefølge', type: 'boolean', default: false },
     { key: 'layers', label: 'Lag', type: 'layers', default: {} },
   ],

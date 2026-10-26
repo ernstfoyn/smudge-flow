@@ -70,6 +70,8 @@ export type ParamType =
   | 'file'
   /** Punkter på en tegnet kurve: Array<{ x: 0..1, y: -1..1 }>. */
   | 'curve'
+  /** Fargestopp for en gradient. */
+  | 'gradient'
   /**
    * Per-lag-innstillinger for en multiple-port, nøklet på kant-id.
    * Brukes av lagstabelen: hvert lag får sin egen modus og dekkevne.

@@ -15,6 +15,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { useGraphStore } from '../state/useGraphStore'
 import { useThemeStore } from '../state/useThemeStore'
+import { useEditorStore } from '../state/useEditorStore'
 import { isMediaFile, mediaParamsFromAsset, putAsset } from '../assets/media'
 import { useConnectionDrag } from '../state/useConnectionDrag'
 import {
@@ -24,6 +25,7 @@ import {
   nodePorts,
 } from '../engine/graph'
 import { DRIVE_PORT_ID, drivableParams } from '../engine/drive'
+import { layoutPositions, type NodeSize } from '../engine/layout'
 import { NodeCard } from './nodes/NodeCard'
 import { NodeTabMenu } from './NodeTabMenu'
 import { PortLegend } from './PortLegend'
@@ -36,6 +38,8 @@ interface MenuAnchor {
   x: number
   y: number
   host: { left: number; top: number; width: number; height: number }
+  /** Når menyen ble åpnet på en kobling, skal valgt node settes inn der. */
+  edgeId?: string
 }
 
 /** Skal ikke stjele Tab fra felt og andre redigerbare elementer. */
@@ -48,6 +52,32 @@ function isTextEntryTarget(target: EventTarget | null): boolean {
   )
 }
 
+/** Finner koblingen nærmest et skjermpunkt, innenfor en liten radius. */
+function edgeAtPoint(clientX: number, clientY: number, maxDistance = 24): string | null {
+  let best: { id: string; distance: number } | null = null
+  for (const path of document.querySelectorAll<SVGPathElement>('.react-flow__edge-path')) {
+    const group = path.closest<HTMLElement>('.react-flow__edge')
+    if (!group) continue
+    const testId = group.getAttribute('data-testid') ?? group.id
+    const id = testId.startsWith('rf__edge-')
+      ? testId.slice('rf__edge-'.length)
+      : testId || null
+    if (!id) continue
+    const matrix = path.getScreenCTM()
+    if (!matrix) continue
+    const length = path.getTotalLength()
+    let distance = Number.POSITIVE_INFINITY
+    for (let i = 0; i <= 24; i++) {
+      const point = path.getPointAtLength((length * i) / 24).matrixTransform(matrix)
+      distance = Math.min(distance, Math.hypot(point.x - clientX, point.y - clientY))
+    }
+    if (distance <= maxDistance && (!best || distance < best.distance)) {
+      best = { id, distance }
+    }
+  }
+  return best?.id ?? null
+}
+
 function FlowInner() {
   const graph = useGraphStore((s) => s.graph)
   const theme = useThemeStore((s) => s.theme)
@@ -56,6 +86,9 @@ function FlowInner() {
   const moveNode = useGraphStore((s) => s.moveNode)
   const connect = useGraphStore((s) => s.connect)
   const addNode = useGraphStore((s) => s.addNode)
+  const insertNodeOnEdge = useGraphStore((s) => s.insertNodeOnEdge)
+  const setNodePositions = useGraphStore((s) => s.setNodePositions)
+  const layoutRequest = useEditorStore((s) => s.layoutRequest)
   const updateSelection = useGraphStore((s) => s.updateSelection)
   const removeNode = useGraphStore((s) => s.removeNode)
   const disconnect = useGraphStore((s) => s.disconnect)
@@ -74,6 +107,7 @@ function FlowInner() {
   const altKeyRef = useRef(false)
   const pointerRef = useRef<{ x: number; y: number } | null>(null)
   const [menu, setMenu] = useState<MenuAnchor | null>(null)
+  const lastLayoutRequest = useRef(0)
 
   useEffect(() => () => useConnectionDrag.getState().end(), [])
 
@@ -311,6 +345,13 @@ function FlowInner() {
 
       const type = event.dataTransfer.getData('application/smudge-node')
       if (type) {
+        if (event.shiftKey) {
+          const edgeId = edgeAtPoint(event.clientX, event.clientY)
+          if (edgeId) {
+            insertNodeOnEdge(edgeId, type)
+            return
+          }
+        }
         addNode(type, position)
         return
       }
@@ -342,7 +383,7 @@ function FlowInner() {
           }),
         )
     },
-    [addNode, reactFlow],
+    [addNode, insertNodeOnEdge, reactFlow],
   )
 
   /**
@@ -378,6 +419,7 @@ function FlowInner() {
       if (!inside && !focusInCanvas && active !== document.body) return
 
       event.preventDefault()
+      const selected = useGraphStore.getState().selectedEdges
       setMenu({
         x: inside ? pointer.x : rect.left + rect.width / 2,
         y: inside ? pointer.y : rect.top + rect.height / 2,
@@ -387,6 +429,7 @@ function FlowInner() {
           width: rect.width,
           height: rect.height,
         },
+        edgeId: selected.length === 1 ? selected[0] : undefined,
       })
     }
 
@@ -396,15 +439,52 @@ function FlowInner() {
 
   const closeTabMenu = useCallback(() => setMenu(null), [])
 
+  const arrangeNodes = useCallback(() => {
+    const sizes = new Map<NodeId, NodeSize>()
+    for (const node of reactFlow.getNodes()) {
+      sizes.set(node.id, {
+        width: node.measured?.width ?? 232,
+        height: node.measured?.height ?? 180,
+      })
+    }
+    const positions = layoutPositions(useGraphStore.getState().graph, sizes)
+    setNodePositions(positions)
+    window.requestAnimationFrame(() => {
+      void reactFlow.fitView({ padding: 0.2, duration: 350 })
+    })
+  }, [reactFlow, setNodePositions])
+
+  useEffect(() => {
+    if (layoutRequest === lastLayoutRequest.current) return
+    lastLayoutRequest.current = layoutRequest
+    arrangeNodes()
+  }, [layoutRequest, arrangeNodes])
+
   const pickNode = useCallback(
     (def: NodeDefinition) => {
       if (!menu) return
-      const position = reactFlow.screenToFlowPosition({ x: menu.x, y: menu.y })
-      addNode(def.type, position)
+      if (menu.edgeId) {
+        insertNodeOnEdge(menu.edgeId, def.type)
+      } else {
+        const position = reactFlow.screenToFlowPosition({ x: menu.x, y: menu.y })
+        addNode(def.type, position)
+      }
       setMenu(null)
     },
-    [addNode, menu, reactFlow],
+    [addNode, insertNodeOnEdge, menu, reactFlow],
   )
+
+  const onEdgeDoubleClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    const host = hostRef.current
+    if (!host) return
+    const rect = host.getBoundingClientRect()
+    setMenu({
+      x: event.clientX,
+      y: event.clientY,
+      host: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      edgeId: edge.id,
+    })
+  }, [])
 
   /**
    * Delete/Backspace sletter det som er merket.
@@ -619,6 +699,7 @@ function FlowInner() {
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onEdgeDoubleClick={onEdgeDoubleClick}
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}
@@ -695,7 +776,7 @@ function FlowInner() {
       )}
 
       <span className="pointer-events-none absolute bottom-2 left-2 right-2 truncate text-[10px] text-zinc-600">
-        Tab: legg til node · Dra noder fra paletten hit · Shift-klikk for å merke flere · Delete fjerner valgte noder og koblinger
+        Tab: legg til node · Tab på valgt kobling: sett inn · Shift + dra fra paletten til en kobling: sett inn · Delete fjerner valgte noder og koblinger
       </span>
 
       {menu && (

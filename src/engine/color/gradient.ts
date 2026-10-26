@@ -4,6 +4,8 @@
  */
 
 export interface GradientStop {
+  /** Stabil ID for UI-et; brukes ikke av fargeberegningen. */
+  id?: string
   position: number
   color: string
   softness?: number
@@ -12,7 +14,7 @@ export interface GradientStop {
 export interface GradientProperties {
   colorA: string
   colorB: string
-  gradient?: { stops: Record<string, GradientStop> }
+  gradient?: { stops: Record<string, GradientStop> | GradientStop[] }
 }
 
 const rgb = (hex: string): number[] =>
@@ -29,12 +31,15 @@ export function blend(a: string, b: string, t: number): string {
 
 /** Normaliserer til en sortert liste på maks 8 stopp. */
 export function stops(p: GradientProperties): GradientStop[] {
-  const list = p.gradient
-    ? Object.values(p.gradient.stops)
-    : [
-        { position: 0, color: p.colorA, softness: 1 },
-        { position: 1, color: p.colorB, softness: 1 },
-      ]
+  const raw = p.gradient?.stops
+  const list = Array.isArray(raw)
+    ? raw
+    : raw
+      ? Object.values(raw)
+      : [
+          { position: 0, color: p.colorA, softness: 1 },
+          { position: 1, color: p.colorB, softness: 1 },
+        ]
   return list
     .map((s) => ({
       ...s,

@@ -52,7 +52,8 @@ export class PostProcess {
   constructor(width: number, height: number) {
     this.renderer = new THREE.WebGLRenderer({
       antialias: false,
-      alpha: false,
+      alpha: true,
+      premultipliedAlpha: false,
       preserveDrawingBuffer: true,
     })
     this.renderer.setPixelRatio(1)
@@ -73,9 +74,10 @@ vec3 applyLook(vec3 col, vec2 uv, vec2 centered) {
 void main() {
   vec2 uv = vUv;
   vec2 centered = uv - 0.5;
-  vec3 col = texture2D(uTexture, uv).rgb;
+  vec4 source = texture2D(uTexture, uv);
+  vec3 col = source.rgb;
   col = applyLook(col, uv, centered);
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col, source.a);
 }
 `,
       uniforms: {
@@ -125,9 +127,10 @@ ${glsl}
 void main() {
   vec2 uv = vUv;
   vec2 centered = uv - 0.5;
-  vec3 col = texture2D(uTexture, uv).rgb;
+  vec4 source = texture2D(uTexture, uv);
+  vec3 col = source.rgb;
   col = applyLook(col, uv, centered);
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col, source.a);
 }
 `
 

@@ -6,6 +6,7 @@ export interface Shape2DParams {
   shape: Shape2DKind
   width: number
   height: number
+  scale: number
   x: number
   y: number
   rotation: number
@@ -103,6 +104,7 @@ export const shape2D: NodeDefinition<Shape2DParams> = {
     },
     { key: 'width', label: 'Bredde', type: 'number', default: 0.4, min: 0, max: 2, step: 0.01, animatable: true },
     { key: 'height', label: 'Høyde', type: 'number', default: 0.4, min: 0, max: 2, step: 0.01, animatable: true },
+    { key: 'scale', label: 'Universell skala', type: 'number', default: 1, min: 0.01, max: 10, step: 0.01, animatable: true },
     { key: 'x', label: 'X', type: 'number', default: 0.5, min: -1, max: 2, step: 0.01, animatable: true },
     { key: 'y', label: 'Y', type: 'number', default: 0.5, min: -1, max: 2, step: 0.01, animatable: true },
     { key: 'rotation', label: 'Rotasjon', type: 'number', default: 0, min: -360, max: 360, step: 1, animatable: true },
@@ -116,8 +118,9 @@ export const shape2D: NodeDefinition<Shape2DParams> = {
   evaluate(ctx, _inputs, p) {
     const target = ctx.render.canvas(ctx.scopeKey)
     const c = target.ctx
-    const w = target.width * Number(p.width)
-    const h = target.height * Number(p.height)
+    const scale = Math.max(0.01, Number(p.scale))
+    const w = target.width * Number(p.width) * scale
+    const h = target.height * Number(p.height) * scale
 
     c.save()
     c.setTransform(1, 0, 0, 1, 0, 0)

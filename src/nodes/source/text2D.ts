@@ -3,6 +3,7 @@ import type { NodeDefinition } from '../../engine/types'
 export interface Text2DParams {
   text: string
   size: number
+  scale: number
   font: string
   weight: string
   color: string
@@ -28,14 +29,21 @@ export const text2D: NodeDefinition<Text2DParams> = {
   params: [
     { key: 'text', label: 'Tekst', type: 'text', default: 'SMUDGE' },
     { key: 'size', label: 'Størrelse', type: 'number', default: 120, min: 8, max: 1000, step: 1, animatable: true },
+    { key: 'scale', label: 'Universell skala', type: 'number', default: 1, min: 0.01, max: 10, step: 0.01, animatable: true },
     {
       key: 'font', label: 'Font', type: 'enum', default: 'ui-sans-serif',
       options: [
-        { value: 'ui-sans-serif', label: 'System' },
+        { value: 'ui-sans-serif, system-ui, sans-serif', label: 'System' },
+        { value: 'Arial, Helvetica, sans-serif', label: 'Arial' },
+        { value: 'Helvetica, Arial, sans-serif', label: 'Helvetica' },
+        { value: 'Verdana, Geneva, sans-serif', label: 'Verdana' },
+        { value: 'Trebuchet MS, sans-serif', label: 'Trebuchet' },
+        { value: 'Gill Sans, Gill Sans MT, Calibri, sans-serif', label: 'Gill Sans' },
         { value: 'Georgia, serif', label: 'Georgia' },
+        { value: 'Times New Roman, Times, serif', label: 'Times' },
+        { value: 'Palatino Linotype, Book Antiqua, Palatino, serif', label: 'Palatino' },
         { value: 'Courier New, monospace', label: 'Courier' },
         { value: 'Impact, sans-serif', label: 'Impact' },
-        { value: 'Trebuchet MS, sans-serif', label: 'Trebuchet' },
       ],
     },
     {
@@ -64,7 +72,7 @@ export const text2D: NodeDefinition<Text2DParams> = {
   evaluate(ctx, _inputs, p) {
     const target = ctx.render.canvas(ctx.scopeKey)
     const c = target.ctx
-    const size = Math.max(1, Number(p.size))
+    const size = Math.max(1, Number(p.size) * Math.max(0.01, Number(p.scale)))
     const lines = String(p.text ?? '').split('\n')
 
     c.save()

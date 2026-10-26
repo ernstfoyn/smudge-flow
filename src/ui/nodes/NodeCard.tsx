@@ -219,13 +219,13 @@ export function NodeCard({ id, selected }: NodeProps) {
       }
       onDragLeave={acceptsMedia ? () => setFileOver(false) : undefined}
       onDrop={acceptsMedia ? () => setFileOver(false) : undefined}
-      className={`w-[232px] rounded-xl border bg-zinc-900/95 shadow-xl backdrop-blur transition ${
-        selected ? 'border-lime-400/80 ring-1 ring-lime-400/40' : 'border-zinc-700/70'
+      className={`w-[232px] rounded-xl border bg-[var(--node-bg)] shadow-xl ring-1 ring-[var(--node-ring)] backdrop-blur transition ${
+        selected ? 'border-lime-400/80 ring-2 ring-lime-400/40' : 'border-zinc-700/70'
       } ${fileOver ? 'border-lime-400 ring-2 ring-lime-400/40' : ''} ${
         node.enabled === false ? 'opacity-50' : dimmed ? 'opacity-45 saturate-50' : ''
       }`}
     >
-      <header className="flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-2">
+      <header className="flex items-center justify-between gap-2 rounded-t-xl border-b border-zinc-800 bg-[var(--node-header-bg)] px-3 py-2">
         <span className="flex min-w-0 items-center gap-1.5">
           {missing.length > 0 && (
             <span
