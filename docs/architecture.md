@@ -633,6 +633,15 @@ senere flyttes til en egen pakke.
 
 ## 10. Eksport
 
+`src/export/lottie/` lager en Lottie JSON for den delen av grafen som kan
+uttrykkes som vektorer. `compat.ts` analyserer grafen og merker hver node som
+`native`, `partial` eller `unsupported`. `exportLottie.ts` bygger Lottie-lag
+for `source.shape2D`, `source.text2D` (uten gradient), `source.gradient`,
+`modifier.transform2D`, `composite.stack` og `composite.blend`. Keyframes
+oversettes til Lottie-properties, og gradienter samples til Lottie-stopp.
+Noder uten ekvivalent hoppes over med advarsler. Rive-formatet er bevisst ikke
+implementert; `.riv` er binært og knyttet til Rive-editoren.
+
 `src/export/exportGraph.ts` kjører SAMME `evaluator.evaluateFrame()` som
 forhåndsvisningen, men itererer `frame = 0..N-1` uten rAF. Hver frame tegnes
 på en eksplisitt buffer og sendes til MediaBunny med et eksplisitt tidsstempel

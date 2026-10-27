@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { useState, type CSSProperties } from 'react'
 import { registry } from '../../nodes'
 import { useGraphStore } from '../../state/useGraphStore'
+import { useLottieStore } from '../../state/useLottieStore'
 import { useConnectionDrag } from '../../state/useConnectionDrag'
 import { PARAM_PORT_PREFIX, nodeParamDefs, nodePorts } from '../../engine/graph'
 import { DRIVE_PORT_ID, drivableParams, driveSettings, isParamVisible } from '../../engine/drive'
@@ -18,6 +19,12 @@ const CATEGORY_STYLE: Record<string, string> = {
 }
 
 const MAX_VISIBLE_PARAMS = 4
+
+const LOTTIE_BADGE: Record<string, string> = {
+  native: 'border-lime-400/50 bg-lime-400/10 text-lime-300',
+  partial: 'border-amber-400/50 bg-amber-400/10 text-amber-300',
+  unsupported: 'border-red-500/50 bg-red-500/10 text-red-300',
+}
 
 type PortState = 'idle' | 'origin' | 'compatible' | 'incompatible' | 'muted'
 
@@ -105,8 +112,11 @@ function ParamHandle({ id, state, label }: { id: string; state: PortState; label
 }
 
 export function NodeCard({ id, selected }: NodeProps) {
-  const node = useGraphStore((s) => s.graph.nodes.find((n) => n.id === id))
-  const edges = useGraphStore((s) => s.graph.edges)
+  const graph = useGraphStore((s) => s.graph)
+  const node = graph.nodes.find((n) => n.id === id)
+  const edges = graph.edges
+  const lottieInfo = useLottieStore((s) => s.analysis?.nodes[id])
+  const showLottie = lottieInfo && !node?.type.startsWith('output.')
   const select = useGraphStore((s) => s.select)
   const drag = useConnectionDrag((s) => s.drag)
   const [showAllParams, setShowAllParams] = useState(false)
@@ -245,6 +255,14 @@ export function NodeCard({ id, selected }: NodeProps) {
           {isGroup && (
             <span className="shrink-0 rounded bg-violet-500/15 px-1 text-[9px] text-violet-300">
               {node.group?.nodes.length ?? 0} noder
+            </span>
+          )}
+          {showLottie && lottieInfo && (
+            <span
+              title={`Lottie: ${lottieInfo.reason}`}
+              className={`shrink-0 rounded border px-1 text-[9px] font-semibold uppercase leading-none ${LOTTIE_BADGE[lottieInfo.status] ?? ''}`}
+            >
+              L
             </span>
           )}
         </span>

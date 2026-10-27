@@ -419,7 +419,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'eksport',
     title: 'Eksport',
-    summary: 'Lagre animasjonen som video.',
+    summary: 'Lagre animasjonen som video eller Lottie.',
     blocks: [
       {
         type: 'ul',
@@ -429,6 +429,10 @@ export const HELP_TOPICS: HelpTopic[] = [
           'Bredde og høyde: skriv et tall og trykk Enter. Escape angrer.',
           'Eksporten kjører alle frames i full oppløsning, uansett hva forhåndsvisningen viser. Den kan ta en stund.',
           'Når eksporten er ferdig, dukker en lenke opp for å laste ned videoen.',
+          'Lottie (JSON) eksporterer former, tekst uten gradient, gradienter, transform, opacity og keyframes som ekte vektorlag. 3D, shaders og effekter har ingen Lottie-ekvivalent i v1 og hoppes over.',
+          '«Vis kompatibilitet» markerer nodene: grønn er native, gul eksporteres med forbehold, rød hoppes over. Åpne listen under overskriften for å se hvorfor.',
+          'Rive (.riv) er ikke støttet. Rive-formatet er binært og lages i Rive-editoren; Lottie er den åpne vektorveien foreløpig.',
+          'Keyframes med myk start/slutt, sprett eller elastisk eksporteres som lineære i Lottie v1. Bruk lineær eller hold hvis animasjonen skal bli helt lik.',
         ],
       },
     ],

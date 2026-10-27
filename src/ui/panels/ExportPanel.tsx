@@ -1,7 +1,10 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useGraphStore } from '../../state/useGraphStore'
+import { useLottieStore } from '../../state/useLottieStore'
 import { evaluator, renderServices } from '../../state/studio'
 import { exportGraph } from '../../export/exportGraph'
+import { analyzeLottie } from '../../export/lottie/compat'
+import { exportLottie } from '../../export/lottie/exportLottie'
 import { HelpLink } from '../primitives/HelpLink'
 import {
   ASPECT_PRESETS,
@@ -74,6 +77,10 @@ export function ExportPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const [status, setStatus] = useState<Status>({ kind: 'idle', message: 'Klar', progress: 0 })
+  const [lottieMessage, setLottieMessage] = useState<string | null>(null)
+  const [lottieFailed, setLottieFailed] = useState(false)
+  const lottieMode = useLottieStore((s) => s.mode)
+  const setLottieMode = useLottieStore((s) => s.setMode)
   /** Skriveutkast for bredde/høyde: klemmes først når brukeren er ferdig. */
   const [sizeDraft, setSizeDraft] = useState<{ width: string; height: string }>({
     width: '',
@@ -94,6 +101,13 @@ export function ExportPanel() {
       ? undefined
       : graph.nodes.find((node) => node.id === audioChoice) ?? audioNodes[0]
   const audioValue = audioNode?.id ?? 'none'
+  const lottieAnalysis = useMemo(() => analyzeLottie(graph, target?.id ?? null), [graph, target?.id])
+  const lottieIssues = Object.entries(lottieAnalysis.nodes).filter(([id, nodeInfo]) => {
+    if (nodeInfo.status === 'native') return false
+    const node = graph.nodes.find((item) => item.id === id)
+    return node?.type !== 'output.viewport' && node?.type !== 'output.export'
+  })
+  const lottieLayers = lottieAnalysis.counts.native + lottieAnalysis.counts.partial
 
   const setFormat = (next: OutputFormat) => {
     setSettings({ exportFormat: next })
@@ -177,6 +191,26 @@ export function ExportPanel() {
 
   const cancel = () => {
     abortRef.current?.abort()
+  }
+
+  const downloadLottie = () => {
+    try {
+      const result = exportLottie(graph, { targetId: target?.id ?? null })
+      const blob = new Blob([result.json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'smudge-flow.lottie.json'
+      a.click()
+      URL.revokeObjectURL(url)
+      setLottieFailed(false)
+      setLottieMessage(
+        `Eksporterte ${result.layers} lag${result.warnings.length > 0 ? ` · ${result.warnings.length} advarsler` : ''}.`,
+      )
+    } catch (error) {
+      setLottieFailed(true)
+      setLottieMessage((error as Error)?.message ?? 'Kunne ikke eksportere Lottie.')
+    }
   }
 
   return (
@@ -277,6 +311,88 @@ export function ExportPanel() {
           </p>
         </section>
       )}
+
+      <section className="flex min-w-0 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+            Lottie (JSON)
+          </h3>
+          <label className="flex shrink-0 items-center gap-1.5 text-[10px] text-zinc-400">
+            <input
+              type="checkbox"
+              checked={lottieMode}
+              onChange={(e) => setLottieMode(e.target.checked)}
+              className="h-3.5 w-3.5 accent-lime-400"
+            />
+            Vis kompatibilitet
+          </label>
+        </div>
+
+        <p className="text-[10px] leading-relaxed text-zinc-500">
+          Former, tekst uten gradient, gradienter, transform, opacity og keyframes blir ekte
+          Lottie-lag. 3D, shaders og effekter hoppes over.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
+          <span className="inline-flex items-center gap-1 text-lime-300">
+            <span className="h-2 w-2 rounded-full bg-lime-400" />
+            {lottieAnalysis.counts.native} native
+          </span>
+          <span className="inline-flex items-center gap-1 text-amber-300">
+            <span className="h-2 w-2 rounded-full bg-amber-400" />
+            {lottieAnalysis.counts.partial} med forbehold
+          </span>
+          <span className="inline-flex items-center gap-1 text-red-300">
+            <span className="h-2 w-2 rounded-full bg-red-500" />
+            {lottieAnalysis.counts.unsupported} hoppes over
+          </span>
+        </div>
+
+        {lottieIssues.length > 0 && (
+          <details className="rounded border border-zinc-800 bg-zinc-950/40 px-2 py-1.5">
+            <summary className="cursor-pointer text-[10px] text-zinc-400">
+              Hva blir hoppet over eller forenklet?
+            </summary>
+            <ul className="mt-1.5 flex flex-col gap-1">
+              {lottieIssues.map(([id, nodeInfo]) => {
+                const node = graph.nodes.find((item) => item.id === id)
+                return (
+                  <li key={id} className="text-[10px] leading-relaxed text-zinc-500">
+                    <span
+                      className={
+                        nodeInfo.status === 'partial' ? 'text-amber-300' : 'text-red-300'
+                      }
+                    >
+                      {node?.title ?? id}
+                    </span>
+                    {' — '}
+                    {nodeInfo.reason}
+                  </li>
+                )
+              })}
+            </ul>
+          </details>
+        )}
+
+        <button
+          type="button"
+          onClick={downloadLottie}
+          disabled={lottieLayers === 0}
+          className="rounded-lg border border-lime-500/50 bg-lime-500/10 px-3 py-2 text-[12px] font-semibold text-lime-200 transition hover:bg-lime-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          ↓ Eksporter Lottie
+        </button>
+        {lottieMessage && (
+          <p
+            className={`text-[10px] leading-relaxed ${
+              lottieFailed ? 'text-red-300' : 'text-zinc-400'
+            }`}
+            role="status"
+          >
+            {lottieMessage}
+          </p>
+        )}
+      </section>
 
       <section className="flex min-w-0 flex-col gap-2">
         <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">

@@ -49,7 +49,7 @@ eksakt `frames / fps` sekunder.
 | Motor | `src/engine/` | Topologisk sortering, evaluering, param-løsning. Ren TypeScript, ingen React, ingen DOM. |
 | Noder | `src/nodes/` | Nodetyper. Hver er en ren kontrakt: porter inn, porter ut. |
 | Render | `src/render/` | Eneste sted som eier canvas/lerret. Portet fra Orbit + Smudge. |
-| Eksport | `src/export/` | MediaBunny (vendored, MPL-2.0) + deterministisk frame-løkke. |
+| Eksport | `src/export/` | MediaBunny (vendored, MPL-2.0), Lottie-eksport og deterministisk frame-løkke. |
 | Tilstand | `src/state/` | Zustand: graf, avspilling, motor-singletons. |
 | UI | `src/ui/` | React Flow, inspector, timeline, viewport, eksportpanel. |
 
@@ -393,6 +393,24 @@ oppløsningen ikke krymper hver gang du veksler mellom landskap og portrett.
 
 Valgene lagres sammen med grafen. Hvis grafen har en `output.export`-node,
 følger filformatet den nodens innstilling; ellers brukes prosjektinnstillingen.
+
+### Lottie (JSON)
+
+Eksport-panelet kan også lage en **Lottie JSON**. Den inneholder ekte
+vektorlag for:
+
+- 2D-fasong med solid eller gradientfyll, kant, transform og opacity
+- 2D-tekst uten gradient
+- Gradientkilden som bakgrunn
+- Transform 2D, Lagstabel og Blanding
+- Keyframes på posisjon, rotasjon, skala, opacity og størrelse der Lottie
+  har en tilsvarende egenskap
+
+3D, shaders, støy, Celler, Fragmentprisme og rastereffekter har ingen direkte
+Lottie-ekvivalent og hoppes over med en advarsel. Slå på **Vis kompatibilitet**
+for å se grønn (native), gul (med forbehold) og rød (hoppes over) status på
+nodene. Keyframe-easing utover lineær og hold forenkles til lineær i v1.
+Rive (.riv) er ikke støttet.
 
 ---
 
