@@ -37,6 +37,9 @@ export function drivableParams(params: readonly ParamDef[]): ParamDef[] {
 export function isParamVisible(param: ParamDef, values: Record<string, unknown>): boolean {
   if (!param.showWhen) return true
   const current = values[param.showWhen.key]
+  // Mangler den styrende verdien (eldre grafer), viser vi parameteren.
+  // Det er bedre enn å skjule et felt brukeren kanskje trenger.
+  if (current === undefined) return true
   return param.showWhen.in.some((value) => value === current)
 }
 

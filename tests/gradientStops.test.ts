@@ -95,6 +95,16 @@ describe('flerfarge-gradient', () => {
     expect(color(list, 0.25)).not.toBe('#ff0000')
   })
 
+  it('bruker den faste fargen når fyll er ensfarget', () => {
+    const { ctx, calls } = fakeCtx()
+    const result = gradientPaint(ctx as unknown as CanvasRenderingContext2D, 100, {
+      fill: 'solid', colorA: '#ff0000', colorB: '#00ff00', stops: three,
+      angle: 0, travel: 0.5, density: 2,
+    }, 0.25)
+    expect(result).toBe('#ff0000')
+    expect(calls.some((c) => c.name === 'addColorStop')).toBe(false)
+  })
+
   it('legger alle fargestoppene på Canvas-gradienten', () => {
     const { ctx, calls } = fakeCtx()
     gradientPaint(ctx as unknown as CanvasRenderingContext2D, 100, {

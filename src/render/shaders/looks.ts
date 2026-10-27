@@ -298,6 +298,7 @@ uniform sampler2D uTexture;
 uniform float uAmount;   // 0..2  styrke
 uniform float uScale;    // 0..1  skala / frekvens
 uniform float uTime;     // animert tid
+uniform float uPreserveAlpha; // 1 = behold inputens alfa
 
 varying vec2 vUv;
 
@@ -334,8 +335,15 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 // Henter fra passens eget input-lerret.
+//
+// Ved gjennomsiktige piksler (alfa 0) finnes det ingen farge. Da faller vi
+// tilbake til pikselens egen farge, slik at bølger og andre forskyvninger
+// ikke drar svart inn i en form som ligger på en gjennomsiktig bakgrunn.
+vec3 gBaseColor = vec3(0.0);
+
 vec3 sampleImage(vec2 uv) {
-  return texture2D(uTexture, uv).rgb;
+  vec4 sampleColor = texture2D(uTexture, uv);
+  return mix(gBaseColor, sampleColor.rgb, smoothstep(0.0, 0.25, sampleColor.a));
 }
 
 // Effekten selv legges inn som funksjonskroppen i applyLook().

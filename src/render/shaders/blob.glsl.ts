@@ -39,6 +39,7 @@ uniform int   uMat;      // 0 matte, 1 chrome, 2 glass, 3 goo, 4 obsidian, 5 hol
 uniform vec3  uBgA;
 uniform vec3  uBgB;
 uniform int   uBgMode;
+uniform sampler2D uBgGradient;
 
 varying vec2 vUv;
 
@@ -345,7 +346,8 @@ void main() {
   // --- background (chosen in Render Settings) -------------------------------
   vec3 col = uBgA;
   if (uBgMode == 1) {
-    col = mix(uBgA, uBgB, clamp(vUv.y * 0.75 + vUv.x * 0.25, 0.0, 1.0));
+    float bgT = clamp(vUv.y * 0.75 + vUv.x * 0.25, 0.0, 1.0);
+    col = texture2D(uBgGradient, vec2(bgT, 0.5)).rgb;
   }
   col *= 1.0 + 0.30 * smoothstep(1.1, 0.0, length(uv));
 

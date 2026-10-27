@@ -14,10 +14,14 @@ export interface PostOptions {  /** GLOW-koden for effekten (uten preamble). */
   scale: number
   /** Animert tid, i sekunder. */
   time: number
+  /** Behold inputens alfa i stedet for å dekke hele flaten. */
+  preserveAlpha?: boolean
   /** Ekstra tall-uniformer (vec2 sendes som tallpar). */
   uniforms?: Record<string, number | [number, number]>
   /** Ekstra farge-uniformer. */
   colors?: Record<string, string>
+  /** Ekstra tekstur-uniformer. Navnet må matche en sampler2D i shaderen. */
+  textures?: Record<string, CanvasImageSource>
 }
 
 /**
@@ -75,9 +79,10 @@ void main() {
   vec2 uv = vUv;
   vec2 centered = uv - 0.5;
   vec4 source = texture2D(uTexture, uv);
+  gBaseColor = source.rgb;
   vec3 col = source.rgb;
   col = applyLook(col, uv, centered);
-  gl_FragColor = vec4(col, source.a);
+  gl_FragColor = vec4(col, mix(1.0, source.a, uPreserveAlpha));
 }
 `,
       uniforms: {
@@ -85,6 +90,7 @@ void main() {
         uAmount: { value: 1 },
         uScale: { value: 0.5 },
         uTime: { value: 0 },
+        uPreserveAlpha: { value: 0 },
       },
     })
 
@@ -128,9 +134,10 @@ void main() {
   vec2 uv = vUv;
   vec2 centered = uv - 0.5;
   vec4 source = texture2D(uTexture, uv);
+  gBaseColor = source.rgb;
   vec3 col = source.rgb;
   col = applyLook(col, uv, centered);
-  gl_FragColor = vec4(col, source.a);
+  gl_FragColor = vec4(col, mix(1.0, source.a, uPreserveAlpha));
 }
 `
 
@@ -142,6 +149,7 @@ void main() {
         uAmount: { value: 1 },
         uScale: { value: 0.5 },
         uTime: { value: 0 },
+        uPreserveAlpha: { value: 0 },
       },
     })
     this.materials.set(key, material)
@@ -163,6 +171,8 @@ void main() {
     material.uniforms.uAmount.value = options.amount
     material.uniforms.uScale.value = options.scale
     material.uniforms.uTime.value = options.time
+    material.uniforms.uPreserveAlpha = material.uniforms.uPreserveAlpha ?? { value: 0 }
+    material.uniforms.uPreserveAlpha.value = options.preserveAlpha ? 1 : 0
 
     // Ekstra uniformer (blob-shaderen har en hel haug).
     for (const [name, value] of Object.entries(options.uniforms ?? {})) {
@@ -181,6 +191,24 @@ void main() {
       } else {
         ;(material.uniforms[name].value as THREE.Color).set(value)
       }
+    }
+
+    // Teksturer, for eksempel en gradient-LUT til en shader.
+    for (const [name, image] of Object.entries(options.textures ?? {})) {
+      let uniform = material.uniforms[name]
+      if (!uniform) {
+        const texture = new THREE.Texture()
+        texture.minFilter = THREE.LinearFilter
+        texture.magFilter = THREE.LinearFilter
+        texture.generateMipmaps = false
+        texture.wrapS = THREE.ClampToEdgeWrapping
+        texture.wrapT = THREE.ClampToEdgeWrapping
+        uniform = { value: texture }
+        material.uniforms[name] = uniform
+      }
+      const texture = uniform.value as THREE.Texture
+      texture.image = image as TexImageSource
+      texture.needsUpdate = true
     }
 
     this.quad.material = material

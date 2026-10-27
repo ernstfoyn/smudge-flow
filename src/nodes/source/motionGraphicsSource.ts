@@ -5,11 +5,17 @@ import {
   type MotionMode,
   type MotionProperties,
 } from '../../render/raster/motionGraphics'
-import { blend } from '../../engine/color/gradient'
+import {
+  color as sampleGradient,
+  stops as gradientStops,
+  type GradientStop,
+} from '../../engine/color/gradient'
 
 export interface MotionGraphicsParams extends MotionProperties {
   /** 0 = farger fra gradient, 1 = kun farge A. */
   useGradient: boolean
+  /** Flerfarge-gradient. Tom liste faller tilbake til Farge A/B. */
+  stops?: GradientStop[]
 }
 
 /**
@@ -42,8 +48,15 @@ export const motionGraphicsSource: NodeDefinition<MotionGraphicsParams> = {
     { key: 'rotation', label: 'Rotasjon', type: 'number', default: 35, min: 0, max: 100, animatable: true },
     { key: 'speed', label: 'Hastighet', type: 'number', default: 1, min: 1, max: 4, animatable: true },
     { key: 'useGradient', label: 'Gradientfarger', type: 'boolean', default: true },
-    { key: 'colorA', label: 'Farge A', type: 'color', default: '#b9ff66' },
+    {
+      key: 'colorA', label: 'Farge', type: 'color', default: '#b9ff66',
+      showWhen: { key: 'useGradient', in: [false] },
+    },
     { key: 'colorB', label: 'Farge B', type: 'color', default: '#4bdac5' },
+    {
+      key: 'stops', label: 'Fargestopp', type: 'gradient', default: [],
+      showWhen: { key: 'useGradient', in: [true] },
+    },
   ],
   evaluate(ctx, _inputs, p) {
     const target = ctx.render.canvas(ctx.scopeKey)
@@ -57,10 +70,15 @@ export const motionGraphicsSource: NodeDefinition<MotionGraphicsParams> = {
     c.globalAlpha = p.opacity / 100
 
     const items = sample({ ...p, motion: p.motion as MotionMode }, ctx.phase, w, h)
+    const ramp = gradientStops({
+      colorA: p.colorA,
+      colorB: p.colorB,
+      gradient: p.stops && p.stops.length ? { stops: p.stops } : undefined,
+    })
 
     for (const item of items) {
       const mix = p.useGradient ? item.x / Math.max(1, w) : 0
-      c.fillStyle = p.useGradient ? blend(p.colorA, p.colorB, mix) : p.colorA
+      c.fillStyle = p.useGradient ? sampleGradient(ramp, mix) : p.colorA
 
       c.save()
       c.translate(item.x, item.y)

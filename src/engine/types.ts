@@ -94,7 +94,7 @@ export interface ParamDef {
   drivable?: boolean
   group?: string
   /** Vises bare når en annen parameter har en av disse verdiene. */
-  showWhen?: { key: string; in: Array<string | number> }
+  showWhen?: { key: string; in: Array<string | number | boolean> }
 }
 
 export type KeyframeEasing =
@@ -243,10 +243,14 @@ export interface PostOptions {
   scale: number
   /** Animert tid, i sekunder. */
   time: number
+  /** Behold inputens alfa i stedet for å dekke hele flaten. */
+  preserveAlpha?: boolean
   /** Ekstra tall-uniformer. Et tallpar blir en vec2. */
   uniforms?: Record<string, number | [number, number]>
   /** Ekstra farge-uniformer. */
   colors?: Record<string, string>
+  /** Ekstra tekstur-uniformer. Navnet må matche en sampler2D i shaderen. */
+  textures?: Record<string, CanvasImageSource>
 }
 
 export interface RenderServices {

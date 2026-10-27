@@ -1,5 +1,7 @@
 import type { NodeDefinition } from '../../engine/types'
+import type { GradientStop } from '../../engine/color/gradient'
 import { blit } from '../../render/blit'
+import { gradientLutFor } from '../../render/raster/gradientTexture'
 import { noiseFragmentShader } from '../../render/shaders/generators'
 
 export interface NoiseParams {
@@ -11,6 +13,8 @@ export interface NoiseParams {
   seed: number
   colorA: string
   colorB: string
+  /** Flerfarge-gradient. Tom liste faller tilbake til Farge A/B. */
+  stops?: GradientStop[]
 }
 
 /**
@@ -37,9 +41,17 @@ export const noise: NodeDefinition<NoiseParams> = {
     { key: 'seed', label: 'Frø', type: 'number', default: 1, min: 0, max: 100, step: 0.01 },
     { key: 'colorA', label: 'Farge A', type: 'color', default: '#05050a' },
     { key: 'colorB', label: 'Farge B', type: 'color', default: '#b9ff66' },
+    { key: 'stops', label: 'Fargestopp', type: 'gradient', default: [] },
   ],
   async evaluate(ctx, _inputs, p) {
     const target = ctx.render.canvas(ctx.scopeKey)
+    const ramp = gradientLutFor(
+      ctx.nodeCache,
+      'colorRamp',
+      String(p.colorA),
+      String(p.colorB),
+      p.stops,
+    )
 
     const result = await ctx.render.post(null, {
       glsl: noiseFragmentShader,
@@ -60,6 +72,9 @@ export const noise: NodeDefinition<NoiseParams> = {
       colors: {
         uColorA: String(p.colorA),
         uColorB: String(p.colorB),
+      },
+      textures: {
+        uColorRamp: ramp,
       },
     })
 

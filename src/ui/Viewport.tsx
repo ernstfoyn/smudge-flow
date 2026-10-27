@@ -131,7 +131,7 @@ export function Viewport() {
   return (
     <div className="flex h-full min-w-0 w-full items-center justify-center bg-[var(--stage-bg)] p-3">
       <div
-        className="relative overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl"
+        className="stage-checkerboard relative overflow-hidden rounded-xl border border-white/10 shadow-2xl"
         style={{ aspectRatio: `${aspect}`, maxHeight: '100%', width: aspect >= 1 ? '100%' : 'auto', maxWidth: '100%' }}
       >
         <canvas ref={canvasRef} className="block h-full w-full" />

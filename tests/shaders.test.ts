@@ -24,6 +24,7 @@ describe('shader-splitt', () => {
       // Styrke og skala er animerbare.
       expect(def.params.find((p) => p.key === 'amount')?.animatable).toBe(true)
       expect(def.params.find((p) => p.key === 'scale')?.animatable).toBe(true)
+      expect(def.params.find((p) => p.key === 'preserveAlpha')?.default).toBe(false)
     }
   })
 

@@ -1,5 +1,7 @@
 import type { NodeDefinition } from '../../engine/types'
+import type { GradientStop } from '../../engine/color/gradient'
 import { blit } from '../../render/blit'
+import { gradientLutFor } from '../../render/raster/gradientTexture'
 import { voronoiFragmentShader } from '../../render/shaders/generators'
 
 export interface VoronoiParams {
@@ -11,6 +13,8 @@ export interface VoronoiParams {
   seed: number
   colorA: string
   colorB: string
+  /** Flerfarge-gradient. Tom liste faller tilbake til Farge A/B. */
+  stops?: GradientStop[]
 }
 
 const MODES = ['f1', 'edges', 'cells'] as const
@@ -50,9 +54,17 @@ export const voronoi: NodeDefinition<VoronoiParams> = {
     { key: 'seed', label: 'Frø', type: 'number', default: 1, min: 0, max: 100, step: 0.01 },
     { key: 'colorA', label: 'Farge A', type: 'color', default: '#0b0b12' },
     { key: 'colorB', label: 'Farge B', type: 'color', default: '#4bdac5' },
+    { key: 'stops', label: 'Fargestopp', type: 'gradient', default: [] },
   ],
   async evaluate(ctx, _inputs, p) {
     const target = ctx.render.canvas(ctx.scopeKey)
+    const ramp = gradientLutFor(
+      ctx.nodeCache,
+      'colorRamp',
+      String(p.colorA),
+      String(p.colorB),
+      p.stops,
+    )
 
     const result = await ctx.render.post(null, {
       glsl: voronoiFragmentShader,
@@ -72,6 +84,9 @@ export const voronoi: NodeDefinition<VoronoiParams> = {
       colors: {
         uColorA: String(p.colorA),
         uColorB: String(p.colorB),
+      },
+      textures: {
+        uColorRamp: ramp,
       },
     })
 

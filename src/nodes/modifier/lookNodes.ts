@@ -4,6 +4,8 @@ import { LOOKS, type LookDefinition } from '../../render/shaders/looks'
 export interface LookParams {
   amount: number
   scale: number
+  /** Behold formens alfa i stedet for å dekke hele flaten. */
+  preserveAlpha: boolean
 }
 
 /**
@@ -42,6 +44,12 @@ function createLookNode(look: LookDefinition): NodeDefinition<LookParams> {
         step: 0.01,
         animatable: true,
       },
+      {
+        key: 'preserveAlpha',
+        label: 'Behold formens alfa',
+        type: 'boolean',
+        default: false,
+      },
     ],
     async evaluate(ctx, { in: input }, p) {
       const target = ctx.render.canvas(ctx.scopeKey)
@@ -60,6 +68,7 @@ function createLookNode(look: LookDefinition): NodeDefinition<LookParams> {
         amount: Number(p.amount),
         scale: Number(p.scale),
         time,
+        preserveAlpha: Boolean(p.preserveAlpha),
       })
 
       const c = target.ctx

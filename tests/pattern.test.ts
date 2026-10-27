@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { patternNode, type PatternParams } from '../src/nodes/modifier/pattern'
 import { registry } from '../src/nodes'
+import { isParamVisible } from '../src/engine/drive'
 import type { EvalContext, RenderServices } from '../src/engine/types'
 import { fakeRender } from './fakeRender'
 
@@ -90,13 +91,29 @@ describe('Fragmentprisme', () => {
     expect(targetCalls.some((c) => c.name === 'fillRect')).toBe(false)
   })
 
-  it('tegner Sentence-varianten uten feil', () => {
+  it('tegner midtrad-varianten uten feil', () => {
     const { render, targetCalls } = setup()
     const input = { width: 120, height: 80 } as unknown as CanvasImageSource
     expect(() =>
       patternNode.evaluate(context(render), { in: input }, params({ mode: 'echo' })),
     ).not.toThrow()
     expect(targetCalls.filter((c) => c.name === 'drawImage').length).toBeGreaterThan(0)
+  })
+
+  it('skjuler bakgrunnsfargen når bakgrunnen er gjennomsiktig', () => {
+    const background = patternNode.params.find((p) => p.key === 'background')!
+    expect(isParamVisible(background, { transparent: false })).toBe(true)
+    expect(isParamVisible(background, { transparent: true })).toBe(false)
+    expect(isParamVisible(background, {})).toBe(true)
+  })
+
+  it('bruker bildeord i stedet for tekstord i UI-et', () => {
+    expect(patternNode.params.find((p) => p.key === 'size')?.label).toBe('Bildestørrelse')
+    expect(patternNode.params.find((p) => p.key === 'mode')?.label).toBe('Fordeling')
+    expect(patternNode.params.find((p) => p.key === 'mode')?.options?.map((o) => o.label)).toEqual([
+      'Rutenett',
+      'Midtrad + diagonaler',
+    ])
   })
 
   it('gir tomt lerret uten input', () => {

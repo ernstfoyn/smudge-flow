@@ -1,4 +1,6 @@
 import type { NodeDefinition } from '../../engine/types'
+import type { GradientStop } from '../../engine/color/gradient'
+import { gradientPaintBox } from '../../render/raster/gradientFill'
 
 export interface Text2DParams {
   text: string
@@ -7,6 +9,10 @@ export interface Text2DParams {
   font: string
   weight: string
   color: string
+  /** Flerfarge-gradient når gradient er slått på. */
+  gradient?: boolean
+  stops?: GradientStop[]
+  gradientAngle?: number
   align: 'left' | 'center' | 'right'
   x: number
   y: number
@@ -55,7 +61,20 @@ export const text2D: NodeDefinition<Text2DParams> = {
         { value: '900', label: 'Ekstra fet' },
       ],
     },
-    { key: 'color', label: 'Farge', type: 'color', default: '#ffffff' },
+    {
+      key: 'color', label: 'Farge', type: 'color', default: '#ffffff',
+      showWhen: { key: 'gradient', in: [false] },
+    },
+    { key: 'gradient', label: 'Gradientfyll', type: 'boolean', default: false },
+    {
+      key: 'stops', label: 'Fargestopp', type: 'gradient', default: [],
+      showWhen: { key: 'gradient', in: [true] },
+    },
+    {
+      key: 'gradientAngle', label: 'Gradientvinkel', type: 'number', default: 0,
+      min: -180, max: 180, animatable: true,
+      showWhen: { key: 'gradient', in: [true] },
+    },
     {
       key: 'align', label: 'Justering', type: 'enum', default: 'center',
       options: [
@@ -74,6 +93,7 @@ export const text2D: NodeDefinition<Text2DParams> = {
     const c = target.ctx
     const size = Math.max(1, Number(p.size) * Math.max(0.01, Number(p.scale)))
     const lines = String(p.text ?? '').split('\n')
+    const lineHeight = size * Number(p.lineHeight)
 
     c.save()
     c.setTransform(1, 0, 0, 1, 0, 0)
@@ -81,16 +101,44 @@ export const text2D: NodeDefinition<Text2DParams> = {
     c.globalAlpha = Math.min(1, Math.max(0, Number(p.opacity)))
     c.globalCompositeOperation = 'source-over'
     c.font = `${p.weight} ${size}px ${p.font}`
-    c.fillStyle = String(p.color)
     c.textAlign = p.align
     c.textBaseline = 'middle'
 
-    const lineHeight = size * Number(p.lineHeight)
-    const start = target.height * Number(p.y) - ((lines.length - 1) * lineHeight) / 2
-    for (let i = 0; i < lines.length; i++) {
-      c.fillText(lines[i], target.width * Number(p.x), start + i * lineHeight)
+    c.save()
+    c.translate(target.width * Number(p.x), target.height * Number(p.y))
+
+    const blockHeight = (lines.length - 1) * lineHeight
+    if (p.gradient) {
+      const maxWidth = Math.max(1, ...lines.map((line) => c.measureText(line).width))
+      const left =
+        p.align === 'center' ? -maxWidth / 2 : p.align === 'right' ? -maxWidth : 0
+      c.fillStyle = gradientPaintBox(
+        c,
+        {
+          x: left,
+          y: -blockHeight / 2 - size / 2,
+          width: maxWidth,
+          height: blockHeight + size,
+        },
+        {
+          fill: 'linear',
+          colorA: String(p.color),
+          colorB: '#4bdac5',
+          stops: p.stops,
+          angle: Number(p.gradientAngle ?? 0),
+          travel: 0,
+          density: 1,
+        },
+      )
+    } else {
+      c.fillStyle = String(p.color)
     }
 
+    for (let i = 0; i < lines.length; i++) {
+      c.fillText(lines[i], 0, -blockHeight / 2 + i * lineHeight)
+    }
+
+    c.restore()
     c.restore()
     return { out: target.canvas }
   },

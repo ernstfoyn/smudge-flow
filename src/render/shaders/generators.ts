@@ -142,6 +142,7 @@ vec3 voronoi2(vec2 p) {
 export const noiseFragmentShader = /* glsl */ `
 uniform vec3 uColorA;
 uniform vec3 uColorB;
+uniform sampler2D uColorRamp;
 uniform float uScale;
 uniform float uOctaves;
 uniform float uWarp;
@@ -186,13 +187,14 @@ void main() {
   n = n * 0.5 + 0.5;
   n = clamp((n - 0.5) * uContrast + 0.5, 0.0, 1.0);
 
-  gl_FragColor = vec4(mix(uColorA, uColorB, n), 1.0);
+  gl_FragColor = vec4(texture2D(uColorRamp, vec2(clamp(n, 0.0, 1.0), 0.5)).rgb, 1.0);
 }
 `
 
 export const voronoiFragmentShader = /* glsl */ `
 uniform vec3 uColorA;
 uniform vec3 uColorB;
+uniform sampler2D uColorRamp;
 uniform float uScale;
 uniform float uMode;
 uniform float uEdge;
@@ -231,6 +233,6 @@ void main() {
   }
 
   value = clamp((value - 0.5) * uContrast + 0.5, 0.0, 1.0);
-  gl_FragColor = vec4(mix(uColorA, uColorB, value), 1.0);
+  gl_FragColor = vec4(texture2D(uColorRamp, vec2(clamp(value, 0.0, 1.0), 0.5)).rgb, 1.0);
 }
 `

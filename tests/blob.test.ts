@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Evaluator } from '../src/engine/evaluator'
 import { NodeRegistry } from '../src/engine/registry'
 import { blob3D } from '../src/nodes/source/blob3D'
@@ -23,6 +23,14 @@ function recordingRender() {
     globalCompositeOperation: '',
   }
   const canvases = new Map<string, unknown>()
+
+  vi.stubGlobal('document', {
+    createElement: () => ({
+      width: 1,
+      height: 1,
+      getContext: () => context,
+    }),
+  })
 
   const render = {
     width: 64,
@@ -57,6 +65,10 @@ function graph(): Graph {
   }
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('blob uten bilde', () => {
   it('har valgfri bildeinngang', () => {
     expect(blob3D.inputs[0].optional).toBe(true)
@@ -70,6 +82,7 @@ describe('blob uten bilde', () => {
 
     expect(calls).toHaveLength(1)
     expect(calls[0].input).toBeTruthy()
+    expect(calls[0].options.textures?.uBgGradient).toBeTruthy()
     expect(gradients).toContain('#112233')
     expect(gradients).toContain('#aabbcc')
   })

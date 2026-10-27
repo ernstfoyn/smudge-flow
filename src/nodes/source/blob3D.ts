@@ -1,4 +1,6 @@
 import type { EvalContext, NodeDefinition } from '../../engine/types'
+import type { GradientStop } from '../../engine/color/gradient'
+import { gradientLutFor } from '../../render/raster/gradientTexture'
 
 export type BlobShape =
   | 'sphere'
@@ -33,6 +35,8 @@ export interface BlobParams {
   backgroundMode: 'solid' | 'gradient'
   backgroundA: string
   backgroundB: string
+  /** Flerfarge-gradient for bakgrunnen. Tom liste faller tilbake til A/B. */
+  stops?: GradientStop[]
   /** Fargene på reserveteksturen som brukes når ingen bilde er koblet til. */
   imageA: string
   imageB: string
@@ -130,8 +134,15 @@ export const blob3D: NodeDefinition<BlobParams> = {
         { value: 'gradient', label: 'Gradient' },
       ],
     },
-    { key: 'backgroundA', label: 'Bakgrunn A', type: 'color', default: '#241f3d' },
+    {
+      key: 'backgroundA', label: 'Bakgrunnsfarge', type: 'color', default: '#241f3d',
+      showWhen: { key: 'backgroundMode', in: ['solid'] },
+    },
     { key: 'backgroundB', label: 'Bakgrunn B', type: 'color', default: '#05050a' },
+    {
+      key: 'stops', label: 'Bakgrunnsgradient', type: 'gradient', default: [],
+      showWhen: { key: 'backgroundMode', in: ['gradient'] },
+    },
     { key: 'imageA', label: 'Farge A (uten bilde)', type: 'color', default: '#8b5cf6' },
     { key: 'imageB', label: 'Farge B (uten bilde)', type: 'color', default: '#22d3ee' },
   ],
@@ -142,6 +153,14 @@ export const blob3D: NodeDefinition<BlobParams> = {
     const source = (input as CanvasImageSource | undefined) ?? fallbackTexture(ctx, p)
 
     const { blobFragmentShader } = await import('../../render/shaders/blob.glsl')
+
+    const bgLut = gradientLutFor(
+      ctx.nodeCache,
+      'bgGradient',
+      String(p.backgroundA),
+      String(p.backgroundB),
+      p.stops,
+    )
 
     // Tiden ping-pong-er, slik at formen lukker seg i loopen.
     const cycle = ctx.totalFrames / ctx.fps
@@ -174,6 +193,9 @@ export const blob3D: NodeDefinition<BlobParams> = {
       colors: {
         uBgA: String(p.backgroundA),
         uBgB: String(p.backgroundB),
+      },
+      textures: {
+        uBgGradient: bgLut,
       },
     })
 

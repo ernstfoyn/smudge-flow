@@ -1,4 +1,6 @@
 import type { NodeDefinition } from '../../engine/types'
+import type { GradientStop } from '../../engine/color/gradient'
+import { gradientPaintBox } from '../../render/raster/gradientFill'
 
 export type Shape2DKind = 'rectangle' | 'ellipse' | 'triangle' | 'diamond' | 'star' | 'polygon'
 
@@ -13,6 +15,10 @@ export interface Shape2DParams {
   sides: number
   innerRadius: number
   fill: string
+  /** Flerfarge-gradient når gradient er slått på. */
+  gradient?: boolean
+  stops?: GradientStop[]
+  gradientAngle?: number
   stroke: string
   strokeWidth: number
   opacity: number
@@ -110,7 +116,20 @@ export const shape2D: NodeDefinition<Shape2DParams> = {
     { key: 'rotation', label: 'Rotasjon', type: 'number', default: 0, min: -360, max: 360, step: 1, animatable: true },
     { key: 'sides', label: 'Kanter', type: 'int', default: 6, min: 3, max: 24, animatable: false },
     { key: 'innerRadius', label: 'Indre radius', type: 'number', default: 0.45, min: 0.05, max: 1, step: 0.01, animatable: true },
-    { key: 'fill', label: 'Fyll', type: 'color', default: '#b9ff66' },
+    {
+      key: 'fill', label: 'Fyll', type: 'color', default: '#b9ff66',
+      showWhen: { key: 'gradient', in: [false] },
+    },
+    { key: 'gradient', label: 'Gradientfyll', type: 'boolean', default: false },
+    {
+      key: 'stops', label: 'Fargestopp', type: 'gradient', default: [],
+      showWhen: { key: 'gradient', in: [true] },
+    },
+    {
+      key: 'gradientAngle', label: 'Gradientvinkel', type: 'number', default: 0,
+      min: -180, max: 180, animatable: true,
+      showWhen: { key: 'gradient', in: [true] },
+    },
     { key: 'stroke', label: 'Kant', type: 'color', default: '#ffffff' },
     { key: 'strokeWidth', label: 'Kantbredde', type: 'number', default: 0, min: 0, max: 50, step: 0.5, animatable: true },
     { key: 'opacity', label: 'Dekkevne', type: 'number', default: 1, min: 0, max: 1, step: 0.01, animatable: true },
@@ -132,7 +151,21 @@ export const shape2D: NodeDefinition<Shape2DParams> = {
 
     c.beginPath()
     pathFor(c, p.shape, w, h, p)
-    c.fillStyle = String(p.fill)
+    c.fillStyle = p.gradient
+      ? gradientPaintBox(
+          c,
+          { x: -w / 2, y: -h / 2, width: w, height: h },
+          {
+            fill: 'linear',
+            colorA: String(p.fill),
+            colorB: '#4bdac5',
+            stops: p.stops,
+            angle: Number(p.gradientAngle ?? 0),
+            travel: 0,
+            density: 1,
+          },
+        )
+      : String(p.fill)
     c.fill()
     if (Number(p.strokeWidth) > 0) {
       c.lineWidth = Number(p.strokeWidth)

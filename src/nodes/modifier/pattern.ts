@@ -25,7 +25,7 @@ const clamp = (value: number, min: number, max: number) =>
 /**
  * Fragmentert prisme, portet fra patternable.
  *
- * Ett bilde bygges som ett glyph-lag og tegnes på nytt inn i hvert rutenett.
+ * Inputbildet tegnes som ett bildeflate-lag og gjentas inn i hvert rutenett.
  * Hver rute klippes og forskyves etter kolonne og rad, med valgfri squeeze,
  * kompresjon, rotasjon og per-rute jitter.
  */
@@ -34,29 +34,32 @@ export const patternNode: NodeDefinition<PatternParams> = {
   label: 'Fragmentprisme',
   category: 'modifier',
   description:
-    'Deler bildet inn i et rutenett der hver rute viser et forskjøvet utsnitt. Gir patternable-effekten med squeeze, kompresjon, rotasjon og animert jitter.',
+    'Deler inputbildet inn i et rutenett der hver rute viser et forskjøvet utsnitt. Gir patternable-effekten med squeeze, kompresjon, rotasjon og animert jitter.',
   inputs: [{ id: 'in', label: 'Bilde', type: 'drawable' }],
   outputs: [{ id: 'out', label: 'Bilde', type: 'canvas' }],
   params: [
-    { key: 'size', label: 'Glyphstørrelse', type: 'number', default: 400, min: 10, max: 1500, step: 10, animatable: true },
+    { key: 'size', label: 'Bildestørrelse', type: 'number', default: 400, min: 10, max: 1500, step: 10, animatable: true },
     { key: 'cell', label: 'Rutestørrelse', type: 'number', default: 80, min: 8, max: 240, step: 2, animatable: true },
-    { key: 'shiftX', label: 'Gridforskyvning X', type: 'number', default: 40, min: 0, max: 160, step: 1, animatable: true },
-    { key: 'shiftY', label: 'Gridforskyvning Y', type: 'number', default: 30, min: 0, max: 160, step: 1, animatable: true },
+    { key: 'shiftX', label: 'Rutenettforskyvning X', type: 'number', default: 40, min: 0, max: 160, step: 1, animatable: true },
+    { key: 'shiftY', label: 'Rutenettforskyvning Y', type: 'number', default: 30, min: 0, max: 160, step: 1, animatable: true },
     { key: 'squeeze', label: 'Squeeze', type: 'number', default: 0, min: -50, max: 50, step: 1, animatable: true },
     { key: 'compression', label: 'Kompresjon Y', type: 'number', default: 0, min: 0, max: 100, step: 1, animatable: true },
     { key: 'rotation', label: 'Rotasjon per rute', type: 'number', default: 0, min: 0, max: 50, step: 1, animatable: true },
     { key: 'randomMotion', label: 'Tilfeldig bevegelse', type: 'number', default: 15, min: 0, max: 100, step: 1, animatable: true },
     { key: 'speed', label: 'Bevegelsesfart', type: 'number', default: 0.6, min: 0, max: 5, step: 0.1, animatable: true },
     {
-      key: 'mode', label: 'Mønster', type: 'enum', default: 'grid',
+      key: 'mode', label: 'Fordeling', type: 'enum', default: 'grid',
       options: [
-        { value: 'grid', label: 'Word (tett rutenett)' },
-        { value: 'echo', label: 'Sentence (midtrad + diagonaler)' },
+        { value: 'grid', label: 'Rutenett' },
+        { value: 'echo', label: 'Midtrad + diagonaler' },
       ],
     },
     { key: 'mono', label: 'Svart/hvitt', type: 'boolean', default: false },
-    { key: 'background', label: 'Bakgrunn', type: 'color', default: '#ffffff' },
     { key: 'transparent', label: 'Gjennomsiktig bakgrunn', type: 'boolean', default: false },
+    {
+      key: 'background', label: 'Bakgrunnsfarge', type: 'color', default: '#ffffff',
+      showWhen: { key: 'transparent', in: [false] },
+    },
   ],
   evaluate(ctx, { in: input }, p) {
     const target = ctx.render.canvas(ctx.scopeKey)

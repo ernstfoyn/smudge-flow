@@ -21,6 +21,16 @@ function recordingRender(width = 200, height = 100) {
       stroke: () => calls.push({ name: 'stroke', args: [] }),
       translate: (...args: unknown[]) => calls.push({ name: 'translate', args }),
       rotate: (...args: unknown[]) => calls.push({ name: 'rotate', args }),
+      createLinearGradient: (...args: unknown[]) => {
+        calls.push({ name: 'createLinearGradient', args })
+        return {
+          addColorStop: (...stop: unknown[]) => calls.push({ name: 'addColorStop', args: stop }),
+        }
+      },
+      measureText: (text: string) => {
+        calls.push({ name: 'measureText', args: [text] })
+        return { width: text.length * 10 }
+      },
       save: () => {},
       restore: () => {},
       setTransform: () => {},
@@ -99,6 +109,23 @@ describe('2D-tekst', () => {
     expect(a.calls.length).toBeGreaterThan(0)
     expect(b.calls).toHaveLength(0)
   })
+
+  it('kan fylle teksten med en flerfarge-gradient', () => {
+    const { render, calls, props } = recordingRender()
+    text2D.evaluate(ctx(render), {}, {
+      ...params,
+      gradient: true,
+      gradientAngle: 0,
+      stops: [
+        { position: 0, color: '#ff0000', softness: 1 },
+        { position: 0.5, color: '#00ff00', softness: 1 },
+        { position: 1, color: '#0000ff', softness: 1 },
+      ],
+    })
+    expect(calls.some((c) => c.name === 'createLinearGradient')).toBe(true)
+    expect(calls.filter((c) => c.name === 'addColorStop').length).toBeGreaterThan(2)
+    expect(typeof props.fillStyle).toBe('object')
+  })
 })
 
 describe('2D-fasong', () => {
@@ -130,6 +157,22 @@ describe('2D-fasong', () => {
     expect(calls.find((c) => c.name === 'rotate')?.args[0]).toBeCloseTo(Math.PI / 4, 9)
     expect(props.fillStyle).toBe('#00ff00')
     expect(props.lineWidth).toBe(3)
+  })
+
+  it('kan fylle fasongen med en flerfarge-gradient', () => {
+    const { render, calls, props } = recordingRender()
+    shape2D.evaluate(ctx(render), {}, {
+      ...base,
+      gradient: true,
+      gradientAngle: 45,
+      stops: [
+        { position: 0, color: '#ff0000', softness: 1 },
+        { position: 1, color: '#0000ff', softness: 1 },
+      ],
+    })
+    expect(calls.some((c) => c.name === 'createLinearGradient')).toBe(true)
+    expect(calls.filter((c) => c.name === 'addColorStop').length).toBeGreaterThan(1)
+    expect(typeof props.fillStyle).toBe('object')
   })
 
   it('tegner alle fasongene uten feil', () => {

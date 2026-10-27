@@ -342,10 +342,16 @@ lyden faktisk kom med.
 
 ### Look-effekter og alfa
 
-Postprosesseringen kjører med alfakanal, og look-shaderen skriver
-`vec4(col, source.a)` i stedet for en fast alfa på 1. Da bevarer VHS, Duotone,
-Blur og de andre effektene gjennomsiktigheten fra inputen, og et lag med en
-effekt kan ligge over en gradient i Lagstabelen uten å skjule den.
+Postprosesseringen kjører med alfakanal. Look-shaderen bruker uniformen
+`uPreserveAlpha`: standard er `0`, så effekten dekker hele flaten og blir ikke
+låst til formen. Parameteren **Behold formens alfa** setter den til `1`, og da
+bevares inputens alfa. For fullflate-effekter over en gradient brukes `screen`
+i Lagstabelen.
+
+`sampleImage()` er også alpha-bevisst: når en effekt forskyver samplingen ut i
+et gjennomsiktig område, brukes pikselens egen farge som fallback. Uten dette
+ville bølge-, linse- og glitch-effekter dratt svart inn i silhuetten til en form
+på gjennomsiktig bakgrunn.
 
 ### Gradienter
 
@@ -362,6 +368,14 @@ beholdes. I `luminance`-modus bygges en 256-trinns LUT fra gradienten, og hver
 piksel mappes etter lysstyrke. Begge virker på lerret, bilde, video, grupper og
 3D-scene-raster.
 
+Samme stoppliste brukes av `source.motionGraphics`, `source.text2D`,
+`source.shape2D`, `source.blob3D`, `source.noise` og `source.voronoi`. For
+Canvas-noder lager `gradientPaintBox()` en gradient som dekker objektets egen
+boks. For shader-noder lager `gradientLutFor()` en 1×256-tekstur som samples i
+GLSL. `PostProcess` har derfor en `textures`-option i tillegg til `colors` og
+`uniforms`. Tomme stopp faller tilbake til nodens `colorA`/`colorB` eller
+tilsvarende fargepar.
+
 ### Fonter
 
 2D-tekst bruker CSS-fontstakker og systemfonter, slik at den følger maskinen.
@@ -373,11 +387,14 @@ størrelse, tykkelse eller kurver endres.
 ### Fragmentprisme
 
 `modifier.pattern` er en Canvas 2D-port av patternable fra
-`Verktoy/pattern-studio`. Noden bygger ett glyph-lag av inputbildet og tegner
-det inn i hvert rutenett, klippet og forskjøvet etter kolonne og rad. `grid`
-tegner hele rutenettet; `echo` tegner midtrad, midtkolonne og diagonale kopier.
-Squeeze, kompresjon, rotasjon og per-rute jitter følger den opprinnelige
-mekanikken. Parametrene er animerbare og erstatter appens egne kurvevalg.
+`Verktoy/pattern-studio`. Noden bygger ett bildeflate-lag av inputbildet og
+tegner det inn i hvert rutenett, klippet og forskjøvet etter kolonne og rad.
+`grid` (Rutenett) tegner hele rutenettet; `echo` (Midtrad + diagonaler) tegner
+midtrad, midtkolonne og diagonale kopier. Squeeze, kompresjon, rotasjon og
+per-rute jitter følger den opprinnelige mekanikken. Parametrene er animerbare.
+Med `transparent` på hoppes bakgrunnsfyllingen over, og alfakanalen bevares.
+UI-et skjuler bakgrunnsfargen når denne er på, slik at det er tydelig at den
+ikke brukes.
 
 ### Kinetic type
 

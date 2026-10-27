@@ -23,6 +23,9 @@ Du bygger en graf av noder. Hver node har **parametere** som kan animeres med
 keyframes eller LFO, og porter som verdier flyter gjennom. Motoren evaluerer
 grafen topologisk for hver frame og sender resultatet til rendereren.
 
+Hold **Alt** (Option på Mac) og klikk på en parameter i Egenskaper for å
+tilbakestille bare den til standardverdien. Vanlig klikk endrer verdien som før.
+
 ```
 source.*  ──▶  modifier.*  ──▶  composite.*  ──▶  output.*
 (gradient,     (transform,      (blend)          (viewport,
@@ -176,9 +179,12 @@ løkke. Nå er de delt:
 
 **Rekkefølgen bestemmes av kantene i grafen.** Koble Kromatisk før VHS, så
 får du VHS-en på det kromatisk-splittede bildet — og bytter du om, får du
-det andre resultatet. Look-effektene bevarer alfa fra inputen, så de kan
-ligge over gradienter og andre lag i en Lagstabel uten å gjøre bakgrunnen
-ugjennomsiktig.
+det andre resultatet. Look-effektene dekker hele flaten som standard, slik at
+effekten ikke blir låst inne i formen. Slå på **Behold formens alfa** når du
+heller vil klippe effekten til silhuetten. For å legge en fullflate-effekt over
+en gradient uten å skjule den, bruk **screen** i Lagstabelen. Når en forskyvning
+sampler utenfor formen, faller den tilbake til pikselens egen farge i stedet for
+å dra svart inn i silhuetten.
 
 ---
 
@@ -208,7 +214,8 @@ primitiver, med bildet pakket på via triplanar mapping.
 Bildeinngangen er **valgfri**. Legger du til en Blob uten å koble noe til,
 pakkes en fargegradient rundt formen (to farger under «Farge A/B (uten
 bilde)»), så den fungerer som en frittstående kilde. Kobler du til et bilde,
-brukes det i stedet.
+brukes det i stedet. Bakgrunnen kan også bruke en flerfarge-gradient med
+**Bakgrunnsgradient** når bakgrunnsmodus er «Gradient».
 
 Den kobles naturlig etter trail-laget, så du kan male inn i formen:
 
@@ -244,6 +251,8 @@ vekt, farge, justering og linjeavstand. `source.shape2D` tegner rektangel,
 ellipse, trekant, diamant, stjerne eller polygon med fyll, kant og rotasjon.
 Begge har **Universell skala**, som skalerer tekststørrelse eller bredde/høyde
 samlet. De følger grafens oppløsning og kan blandes med bilder i en Lagstabel.
+Slå på **Gradientfyll** for å fylle tekst eller fasong med en flerfarge-gradient
+i stedet for en flat farge.
 
 ### Masker og matte
 
@@ -269,6 +278,16 @@ gradientstripen for å legge til et fargestopp der du klikker, eller bruk
 «+ Farge». Du kan ha opptil åtte farger, flytte dem langs skalaen, velge farge
 og justere mykheten mellom nabofargene. Dette er en videreføring av
 gradientmotoren fra Orbit.
+
+Velg **Ensfarget** for en flat farge. Da vises ett vanlig fargefelt i stedet for
+gradienteditoren, og vinkel, fargevandring og tetthet skjules fordi de ikke
+brukes i den modusen.
+
+Samme flerfarge-editor brukes nå også i **Generativ grafikk**, **2D-tekst**,
+**2D-fasong**, **Blob**, **Støy** og **Celler**. Noder med en solid/gradient-
+bryter viser fargefeltet i solid modus og gradienteditoren i gradientmodus.
+Tomme stopp faller tilbake til de gamle Farge A/B-verdiene, så eldre grafer
+virker som før.
 
 `modifier.gradientMap` legger en flerfarge-gradient på et objekt eller en
 gruppe:
@@ -323,10 +342,12 @@ Crash Clock, Vessel, Shine, Boost og BoxSquad.
 ### Fragmentprisme
 
 `modifier.pattern` er patternable-mekanikken fra `Verktoy/pattern-studio`:
-bildet bygges om til ett glyph-lag og tegnes på nytt inn i hvert rutenett,
-forskjøvet etter kolonne og rad. Parametrene er glyphstørrelse, rutestørrelse,
-gridforskyvning, squeeze, kompresjon, rotasjon, tilfeldig bevegelse og fart.
-Velg **Word** for tett rutenett eller **Sentence** for midtrad og diagonaler.
+inputbildet tegnes som ett bildeflate-lag og gjentas inn i hvert rutenett,
+forskjøvet etter kolonne og rad. Parametrene er bildestørrelse, rutestørrelse,
+rutenettforskyvning, squeeze, kompresjon, rotasjon, tilfeldig bevegelse og fart.
+Velg **Rutenett** for tett rutenett eller **Midtrad + diagonaler** for et åpnere
+mønster. **Gjennomsiktig bakgrunn** fjerner bakgrunnsfargen, og gjennomsiktige
+områder vises som et diskret rutemønster i forhåndsvisningen.
 
 Alle parametrene kan animeres med keyframes eller signaler. Den tilfeldige
 bevegelsen bruker animasjonens tid og «Bevegelsesfart».

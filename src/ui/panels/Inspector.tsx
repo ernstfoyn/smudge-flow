@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { registry } from '../../nodes'
 import type { Graph, GraphNode } from '../../engine/types'
+import type { GradientStop } from '../../engine/color/gradient'
 import { nodeParamDefs, nodePorts } from '../../engine/graph'
 import { branchSummary } from '../../engine/branch'
 import {
@@ -188,6 +189,41 @@ function paramLabel(node: GraphNode, key?: string): string {
   return nodeParamDefs(node).find((p) => p.key === key)?.label ?? key
 }
 
+/**
+ * Standardstopp for gradientparametere som ennå ikke har egne stopp.
+ *
+ * Noder med Farge A/B bruker disse som fallback, slik at eldre grafer og
+ * nye noder uten lagrede stopp ser like ut som før.
+ */
+function gradientFallback(node: GraphNode): GradientStop[] {
+  const color = (key: string, fallback: string) => String(node.params[key] ?? fallback)
+  const pair = (a: string, b: string): GradientStop[] => [
+    { position: 0, color: a, softness: 1 },
+    { position: 1, color: b, softness: 1 },
+  ]
+
+  switch (node.type) {
+    case 'source.gradient':
+      return pair(color('colorA', '#b9ff66'), color('colorB', '#4bdac5'))
+    case 'source.motionGraphics':
+      return pair(color('colorA', '#b9ff66'), color('colorB', '#4bdac5'))
+    case 'source.text2D':
+      return pair(color('color', '#ffffff'), '#4bdac5')
+    case 'source.shape2D':
+      return pair(color('fill', '#b9ff66'), '#4bdac5')
+    case 'source.blob3D':
+      return pair(color('backgroundA', '#241f3d'), color('backgroundB', '#05050a'))
+    case 'source.noise':
+      return pair(color('colorA', '#05050a'), color('colorB', '#b9ff66'))
+    case 'source.voronoi':
+      return pair(color('colorA', '#0b0b12'), color('colorB', '#4bdac5'))
+    case 'modifier.gradientMap':
+      return pair('#05050a', '#b9ff66')
+    default:
+      return []
+  }
+}
+
 export function Inspector() {
   const graph = useGraphStore((s) => s.graph)
   const selected = useGraphStore((s) => s.selected)
@@ -224,8 +260,13 @@ export function Inspector() {
   const isGroup = node.type === 'group'
   const def = isGroup ? null : registry.get(node.type)
   const params = def?.params ?? []
+  const paramValues = {
+    ...Object.fromEntries(params.map((p) => [p.key, p.default])),
+    ...node.params,
+  }
   const canPreview = !isGroup && nodePorts(node).outputs.some((p) => isPreviewableType(p.type))
   const isPreviewing = preview?.nodeId === node.id
+  const solidGradient = node.type === 'source.gradient' && paramValues.fill === 'solid'
   const editableParams = params.filter(
     (p) =>
       p.type !== 'layers' &&
@@ -234,11 +275,19 @@ export function Inspector() {
         (node.type === 'source.image' || node.type === 'source.audio') &&
         p.key === 'src'
       ) &&
+      !(node.type === 'source.motionGraphics' && p.key === 'colorB') &&
+      !(node.type === 'source.blob3D' && p.key === 'backgroundB') &&
       !(
         node.type === 'source.gradient' &&
-        (p.key === 'colorA' || p.key === 'colorB')
+        (solidGradient
+          ? p.key === 'colorB' ||
+            p.key === 'stops' ||
+            p.key === 'angle' ||
+            p.key === 'travel' ||
+            p.key === 'density'
+          : p.key === 'colorA' || p.key === 'colorB')
       ) &&
-      isParamVisible(p, node.params),
+      isParamVisible(p, paramValues),
   )
 
   /** Lagene som er koblet til en multiple-port, i tegnerrekkefølge. */
@@ -903,32 +952,27 @@ export function Inspector() {
         >
           {editableParams.map((p) => {
             const value = node.params[p.key] ?? p.default
+            const field = solidGradient && p.key === 'colorA' ? { ...p, label: 'Farge' } : p
             const lfo = node.lfo?.[p.key]
             const hasKeys = (node.tracks?.[p.key]?.length ?? 0) > 0
 
             return (
               <div key={p.key} className="flex min-w-0 flex-col gap-1.5">
                 <div className="flex min-w-0 items-center gap-2">
-                  <div className="min-w-0 flex-1">
+                  <div
+                    className="min-w-0 flex-1"
+                    title={`${field.label} — hold Alt (Option) og klikk for å tilbakestille`}
+                    onPointerDownCapture={(event) => {
+                      if (!event.altKey || event.button !== 0 || node.enabled === false) return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      setParam(node.id, p.key, p.default)
+                    }}
+                  >
                     {p.type === 'gradient' ? (
                       <GradientEditor
                         value={value}
-                        fallback={
-                          node.type === 'source.gradient'
-                            ? [
-                                {
-                                  position: 0,
-                                  color: String(node.params.colorA ?? '#b9ff66'),
-                                  softness: 1,
-                                },
-                                {
-                                  position: 1,
-                                  color: String(node.params.colorB ?? '#4bdac5'),
-                                  softness: 1,
-                                },
-                              ]
-                            : []
-                        }
+                        fallback={gradientFallback(node)}
                         onChange={(stops) => setParam(node.id, p.key, stops)}
                       />
                     ) : p.type === 'file' ? (
@@ -943,7 +987,7 @@ export function Inspector() {
                       />
                     ) : (
                       <ParamField
-                        def={p}
+                        def={field}
                         value={value}
                         disabled={node.enabled === false}
                         onChange={(v) => setParam(node.id, p.key, v)}
@@ -1029,13 +1073,18 @@ export function Inspector() {
             )
           })}
 
-          <button
-            type="button"
-            onClick={() => resetParams(node.id)}
-            className="self-start rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
-          >
-            Tilbakestill parametere
-          </button>
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() => resetParams(node.id)}
+              className="self-start rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+            >
+              Tilbakestill parametere
+            </button>
+            <p className="text-[10px] leading-relaxed text-zinc-600">
+              Tips: Hold Alt (Option) og klikk på en parameter for å tilbakestille bare den.
+            </p>
+          </div>
         </CollapsibleSection>
       ) : (
         <p className="text-[11px] text-zinc-500">Denne noden har ingen parametere.</p>
