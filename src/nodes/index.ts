@@ -21,6 +21,7 @@ import { motion2D } from './modifier/motion2D'
 import { smudgeDeform } from './modifier/smudgeDeform'
 import { lookNodes } from './modifier/lookNodes'
 import { trail } from './modifier/trail'
+import { scatter2D } from './modifier/scatter2D'
 import { scatter3D } from './modifier/scatter3D'
 import { transform3D } from './modifier/transform3D'
 import { motion3D } from './modifier/motion3D'
@@ -84,6 +85,7 @@ export const registry = new NodeRegistry().registerAll([
   ...lookNodes,
   transform3D,
   motion3D,
+  scatter2D,
   scatter3D,
   raster,
   blurNode,

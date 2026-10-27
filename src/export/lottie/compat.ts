@@ -5,6 +5,8 @@ export type LottieStatus = 'native' | 'partial' | 'unsupported'
 export interface LottieNodeInfo {
   status: LottieStatus
   reason: string
+  /** Kan noden faktisk gi minst ett Lottie-lag? */
+  exportable: boolean
 }
 
 export interface LottieAnalysis {
@@ -17,8 +19,12 @@ const NATIVE = 'native' as const
 const PARTIAL = 'partial' as const
 const UNSUPPORTED = 'unsupported' as const
 
-function info(status: LottieStatus, reason: string): LottieNodeInfo {
-  return { status, reason }
+function info(
+  status: LottieStatus,
+  reason: string,
+  exportable = status !== UNSUPPORTED,
+): LottieNodeInfo {
+  return { status, reason, exportable }
 }
 
 function valuesInto(graph: Graph, id: string, port?: string): GraphEdge[] {
@@ -107,7 +113,8 @@ function ownInfo(node: GraphNode): LottieNodeInfo {
     default:
       return info(
         UNSUPPORTED,
-        'Noden har ingen Lottie-ekvivalent i v1. Koble den bort, eller bruk en form, tekst eller gradient.',
+        `«${node.title}» har ingen Lottie-ekvivalent i v1. Koble den bort, eller bruk en form, tekst eller gradient.`,
+        false,
       )
   }
 }
@@ -157,10 +164,48 @@ export function analyzeLottie(graph: Graph, targetId?: string | null): LottieAna
         case 'output.viewport':
         case 'output.export': {
           const input = valuesInto(graph, id)[0]
-          result = input ? visit(input.source) : info(UNSUPPORTED, 'Mangler input.')
-          if (node.type === 'modifier.transform2D') {
-            result = withControlCaveat(node, graph, result)
+          result = input ? visit(input.source) : info(UNSUPPORTED, 'Mangler input.', false)
+          if (node.type === 'modifier.transform2D' && input) {
+            const inputNode = graph.nodes.find((item) => item.id === input.source)
+            if (!result.exportable) {
+              result = info(
+                PARTIAL,
+                `Selve Transform 2D støttes, men inngangen «${inputNode?.title ?? input.source}» kan ikke eksporteres.`,
+                false,
+              )
+            } else {
+              result = withControlCaveat(node, graph, result)
+            }
           }
+          break
+        }
+        case 'modifier.scatter2D': {
+          const input = valuesInto(graph, id)[0]
+          if (!input) {
+            result = info(UNSUPPORTED, '2D-klonen mangler input.', false)
+            break
+          }
+          const inputInfo = visit(input.source)
+          const inputNode = graph.nodes.find((item) => item.id === input.source)
+          if (!inputInfo.exportable) {
+            result = info(
+              PARTIAL,
+              `Selve 2D-klonen støttes, men inngangen «${inputNode?.title ?? input.source}» kan ikke eksporteres.`,
+              false,
+            )
+          } else {
+            const animated = ['spacing', 'radius', 'motionAmount', 'phaseOffset', 'rotationSpread', 'scaleJitter', 'opacity'].some(
+              (key) => hasTrack(node, key),
+            )
+            result = info(
+              inputInfo.status === 'partial' || animated ? PARTIAL : NATIVE,
+              animated
+                ? 'Klonene eksporteres som separate Lottie-lag; animerte avstands-/styrkeparametere bruker grunnverdien.'
+                : 'Klonene eksporteres som separate Lottie-lag. Rotasjon og skala bruker lerretets midtpunkt.',
+              true,
+            )
+          }
+          result = withControlCaveat(node, graph, result)
           break
         }
         case 'composite.stack': {
@@ -169,18 +214,21 @@ export function analyzeLottie(graph: Graph, targetId?: string | null): LottieAna
             result = info(UNSUPPORTED, 'Lagstabelen har ingen lag.')
             break
           }
-          const statuses = inputs.map((input) => visit(input.source).status)
-          const exportable = statuses.filter((status) => status !== UNSUPPORTED)
+          const infos = inputs.map((input) => visit(input.source))
+          const exportable = infos.filter((item) => item.exportable)
+          const skipped = inputs
+            .filter((_, index) => !infos[index].exportable)
+            .map((input) => graph.nodes.find((item) => item.id === input.source)?.title ?? input.source)
           result =
             exportable.length === 0
-              ? info(UNSUPPORTED, 'Ingen av lagene kan eksporteres til Lottie.')
-              : statuses.some((status) => status === UNSUPPORTED)
-                ? info(PARTIAL, 'Noen lag kan ikke eksporteres og hoppes over.')
-                : statuses.some((status) => status === PARTIAL)
-                  ? info(PARTIAL, 'Noen lag har begrensninger; se de gule nodene.')
-                  : info(NATIVE, 'Alle lag kan eksporteres.')
-          if (hasTrack(node, 'opacity')) {
-            result = info(PARTIAL, 'Animert stabel-opacity eksporteres med fast verdi.')
+              ? info(UNSUPPORTED, 'Ingen av lagene kan eksporteres til Lottie.', false)
+              : skipped.length > 0
+                ? info(PARTIAL, `Disse lagene hoppes over: ${skipped.join(', ')}.`, true)
+                : infos.some((item) => item.status === PARTIAL)
+                  ? info(PARTIAL, 'Noen lag har begrensninger; se de gule nodene.', true)
+                  : info(NATIVE, 'Alle lag kan eksporteres.', true)
+          if (hasTrack(node, 'opacity') && result.exportable) {
+            result = info(PARTIAL, 'Animert stabel-opacity eksporteres med fast verdi.', true)
           }
           result = withControlCaveat(node, graph, result)
           break
@@ -192,17 +240,23 @@ export function analyzeLottie(graph: Graph, targetId?: string | null): LottieAna
             result = info(UNSUPPORTED, 'Blandingen mangler begge lag.')
             break
           }
+          const baseInfo = base ? visit(base.source) : undefined
+          const topInfo = top ? visit(top.source) : undefined
           let status: LottieStatus = NATIVE
-          if (base) status = worst(status, visit(base.source).status)
-          if (top) status = worst(status, visit(top.source).status)
+          if (baseInfo) status = worst(status, baseInfo.status)
+          if (topInfo) status = worst(status, topInfo.status)
+          const exportable =
+            Boolean(baseInfo?.exportable || topInfo?.exportable) &&
+            (!baseInfo || baseInfo.exportable) &&
+            (!topInfo || topInfo.exportable)
           result =
             status === UNSUPPORTED
-              ? info(UNSUPPORTED, 'Blandingen trenger to lag som begge kan eksporteres.')
+              ? info(UNSUPPORTED, 'Blandingen trenger to lag som begge kan eksporteres.', false)
               : status === PARTIAL
-                ? info(PARTIAL, 'Blandingen har lag med begrensninger.')
-                : info(NATIVE, 'To Lottie-lag med blandemodus.')
-          if (hasTrack(node, 'opacity')) {
-            result = info(PARTIAL, 'Animert blandings-opacity eksporteres med fast verdi.')
+                ? info(PARTIAL, 'Blandingen har lag med begrensninger.', exportable)
+                : info(NATIVE, 'To Lottie-lag med blandemodus.', exportable)
+          if (hasTrack(node, 'opacity') && result.exportable) {
+            result = info(PARTIAL, 'Animert blandings-opacity eksporteres med fast verdi.', true)
           }
           result = withControlCaveat(node, graph, result)
           break

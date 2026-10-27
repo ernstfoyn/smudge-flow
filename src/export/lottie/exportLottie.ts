@@ -2,6 +2,11 @@ import type { Graph, GraphEdge, GraphNode, Keyframe } from '../../engine/types'
 import { valueAt } from '../../engine/animation/keyframes'
 import { registry } from '../../nodes'
 import { color as sampleColor, stops as gradientStops, type GradientStop } from '../../engine/color/gradient'
+import {
+  scatter2DCount,
+  scatter2DInstance,
+  type Scatter2DParams,
+} from '../../nodes/modifier/scatter2D'
 import { analyzeLottie, type LottieAnalysis } from './compat'
 
 export interface LottieExportOptions {
@@ -436,6 +441,63 @@ function gradientSourceLayer(node: GraphNode, graph: Graph, builder: Builder): J
   return layer
 }
 
+function cloneLayerGroup(layers: Json[], builder: Builder): Json[] {
+  const copies = layers.map((layer) => JSON.parse(JSON.stringify(layer)) as Json)
+  const indexMap = new Map<number, number>()
+  for (const layer of copies) {
+    const previous = Number(layer.ind)
+    layer.ind = builder.nextInd++
+    indexMap.set(previous, layer.ind)
+  }
+  for (const layer of copies) {
+    if (layer.parent) layer.parent = indexMap.get(Number(layer.parent)) ?? layer.parent
+  }
+  return copies
+}
+
+function sampledProperty(frames: number[], values: number[][]): Json {
+  return {
+    a: 1,
+    k: frames.map((frame, index) => ({ t: frame, s: values[index] })),
+  }
+}
+
+function motionFrames(frames: number, cycles: number): number[] {
+  const total = Math.max(1, frames)
+  const samples = Math.min(48, Math.max(2, Math.ceil(Math.max(1, cycles) * 8)))
+  if (samples >= total) return Array.from({ length: total }, (_, index) => index)
+  return Array.from({ length: samples }, (_, index) =>
+    Math.round((index * (total - 1)) / (samples - 1)),
+  )
+}
+
+function applyOpacitySamples(
+  layers: Json[],
+  frames: number[],
+  values: number[],
+  builder: Builder,
+  node: GraphNode,
+): void {
+  let warned = false
+  for (const layer of layers) {
+    const opacity = layer.ks?.o
+    if (!opacity) continue
+    if (opacity.a === 1) {
+      if (!warned) {
+        builder.warnings.push(`${node.title}: fade på et lag med animert opacity er forenklet.`)
+        warned = true
+      }
+      continue
+    }
+    const base = Number(opacity.k ?? 100) / 100
+    opacity.a = 1
+    opacity.k = frames.map((frame, index) => ({
+      t: frame,
+      s: [Math.max(0, Math.min(100, base * values[index] * 100))],
+    }))
+  }
+}
+
 function multiplyOpacity(layer: Json, factor: number): void {
   const o = layer.ks?.o
   if (!o || factor === 1) return
@@ -495,6 +557,85 @@ function exportNode(
     }
     case 'source.gradient':
       return [gradientSourceLayer(node, graph, builder)]
+    case 'modifier.scatter2D': {
+      const input = incoming()[0]
+      if (!input) return []
+      const layers = exportNode(input.source, graph, builder, nextSeen)
+      if (layers.length === 0) return []
+      const params = paramsFor(node) as Scatter2DParams
+      const count = scatter2DCount(params)
+      const pivot = { x: graph.settings.width / 2, y: graph.settings.height / 2 }
+      const motion = String(params.motion ?? 'none')
+      const transformAnimated = (motion !== 'none' && motion !== 'fade') || Math.round(Number(params.spin ?? 0)) !== 0
+      const frames = transformAnimated || motion === 'fade'
+        ? motionFrames(graph.settings.frames, Number(params.motionCycles ?? 1))
+        : []
+      const output: Json[] = []
+
+      if (!builder.warnings.some((warning) => warning.startsWith(`${node.title}:`))) {
+        builder.warnings.push(
+          `${node.title}: rotasjon og skala bruker lerretets midtpunkt i Lottie.`,
+        )
+      }
+
+      for (let index = 0; index < count; index++) {
+        const group = cloneLayerGroup(layers, builder)
+        const wrapper = layerBase(node, graph, 3, builder)
+        wrapper.nm = `${node.title} ${index + 1}`
+
+        if (transformAnimated) {
+          const instances = frames.map((frame) =>
+            scatter2DInstance(params, index, count, frame / Math.max(1, graph.settings.frames)),
+          )
+          wrapper.ks = {
+            o: prop(100),
+            r: sampledProperty(frames, instances.map((item) => [item.rotation])),
+            p: sampledProperty(
+              frames,
+              instances.map((item) => [pivot.x + item.x, pivot.y + item.y, 0]),
+            ),
+            a: prop([pivot.x, pivot.y, 0]),
+            s: sampledProperty(
+              frames,
+              instances.map((item) => [item.scale * 100, item.scale * 100, 100]),
+            ),
+          }
+        } else {
+          const item = scatter2DInstance(params, index, count, 0)
+          wrapper.ks = {
+            o: prop(100),
+            r: prop(item.rotation),
+            p: prop([pivot.x + item.x, pivot.y + item.y, 0]),
+            a: prop([pivot.x, pivot.y, 0]),
+            s: prop([item.scale * 100, item.scale * 100, 100]),
+          }
+        }
+
+        const roots = group.filter((layer) => !layer.parent)
+        for (const layer of roots) layer.parent = wrapper.ind
+
+        if (motion === 'fade') {
+          const values = frames.map((frame) => {
+            const item = scatter2DInstance(
+              params,
+              index,
+              count,
+              frame / Math.max(1, graph.settings.frames),
+            )
+            return item.opacity * Number(params.opacity ?? 1)
+          })
+          applyOpacitySamples(group, frames, values, builder, node)
+        } else {
+          const item = scatter2DInstance(params, index, count, 0)
+          for (const layer of group) {
+            multiplyOpacity(layer, item.opacity * Number(params.opacity ?? 1))
+          }
+        }
+
+        output.push(...group, wrapper)
+      }
+      return output
+    }
     case 'modifier.transform2D': {
       const input = incoming()[0]
       if (!input) return []

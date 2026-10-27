@@ -89,6 +89,34 @@ describe('Lottie-kompatibilitet', () => {
     expect(analysis.nodes.stack.status).toBe('unsupported')
   })
 
+  it('forklarer at Transform 2D er blokkert av en ustøttet inngang', () => {
+    const shape = node('shape', 'source.shape2D', { shape: 'ellipse' })
+    const effect = node('effect', 'modifier.look.fletedGlass')
+    const transform = node('transform', 'modifier.transform2D')
+    const analysis = analyzeLottie(
+      graph(
+        [shape, effect, transform, output()],
+        [edge('shape', 'effect'), edge('effect', 'transform'), edge('transform', 'out', 'frame')],
+      ),
+    )
+    expect(analysis.nodes.transform.status).toBe('partial')
+    expect(analysis.nodes.transform.exportable).toBe(false)
+    expect(analysis.nodes.transform.reason).toContain('Selve Transform 2D støttes')
+  })
+
+  it('merker 2D-kloner som native når inngangen er native', () => {
+    const shape = node('shape', 'source.shape2D', { shape: 'ellipse' })
+    const scatter = node('scatter', 'modifier.scatter2D', { count: 4 })
+    const analysis = analyzeLottie(
+      graph(
+        [shape, scatter, output()],
+        [edge('shape', 'scatter'), edge('scatter', 'out', 'frame')],
+      ),
+    )
+    expect(analysis.nodes.scatter.status).toBe('native')
+    expect(analysis.nodes.scatter.exportable).toBe(true)
+  })
+
   it('merker gradienttekst som ustøttet', () => {
     const text = node('text', 'source.text2D', { text: 'Hei', gradient: true })
     const analysis = analyzeLottie(graph([text, output()], [edge('text', 'out', 'frame')]))
@@ -175,6 +203,46 @@ describe('Lottie-eksport', () => {
     )
     expect(fillOf(result.document.layers[0])).toEqual([0, 0, 1, 1])
     expect(fillOf(result.document.layers[1])).toEqual([1, 0, 0, 1])
+  })
+
+  it('ekspanderer 2D-kloner til separate Lottie-lag', () => {
+    const shape = node('shape', 'source.shape2D', { shape: 'ellipse', fill: '#ff0000' })
+    const scatter = node('scatter', 'modifier.scatter2D', {
+      pattern: 'line', count: 3, spacing: 100, radius: 200, columns: 3,
+      motion: 'float', motionAmount: 40, motionCycles: 1, phaseOffset: 0.15,
+      spin: 0, rotationSpread: 0, scaleJitter: 0, opacity: 1,
+    })
+    const result = exportLottie(
+      graph(
+        [shape, scatter, output()],
+        [edge('shape', 'scatter'), edge('scatter', 'out', 'frame')],
+      ),
+    )
+    expect(result.layers).toBe(3)
+    expect(result.document.layers).toHaveLength(6)
+    const wrappers = result.document.layers.filter((layer: Record<string, any>) => layer.ty === 3)
+    const shapes = result.document.layers.filter((layer: Record<string, any>) => layer.ty === 4)
+    expect(wrappers).toHaveLength(3)
+    expect(shapes).toHaveLength(3)
+    expect(shapes.every((layer: Record<string, any>) => layer.parent === wrappers.find((w: Record<string, any>) => w.ind === layer.parent)?.ind)).toBe(true)
+    expect(wrappers.some((layer: Record<string, any>) => layer.ks.p.a === 1)).toBe(true)
+  })
+
+  it('eksporterer fade som opacity-keyframes på klonene', () => {
+    const shape = node('shape', 'source.shape2D', { shape: 'ellipse', fill: '#ff0000' })
+    const scatter = node('scatter', 'modifier.scatter2D', {
+      pattern: 'line', count: 2, spacing: 100, motion: 'fade', motionAmount: 80,
+      motionCycles: 1, phaseOffset: 0.2, opacity: 1,
+    })
+    const result = exportLottie(
+      graph(
+        [shape, scatter, output()],
+        [edge('shape', 'scatter'), edge('scatter', 'out', 'frame')],
+      ),
+    )
+    const shapes = result.document.layers.filter((layer: Record<string, any>) => layer.ty === 4)
+    expect(shapes).toHaveLength(2)
+    expect(shapes.every((layer: Record<string, any>) => layer.ks.o.a === 1)).toBe(true)
   })
 
   it('hopper over ustøttede noder med advarsel', () => {

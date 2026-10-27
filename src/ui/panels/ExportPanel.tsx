@@ -5,6 +5,7 @@ import { evaluator, renderServices } from '../../state/studio'
 import { exportGraph } from '../../export/exportGraph'
 import { analyzeLottie } from '../../export/lottie/compat'
 import { exportLottie } from '../../export/lottie/exportLottie'
+import { downloadBlob, pickExportDirectory, writeBlobToDirectory } from '../../export/saveFile'
 import { HelpLink } from '../primitives/HelpLink'
 import {
   ASPECT_PRESETS,
@@ -107,7 +108,9 @@ export function ExportPanel() {
     const node = graph.nodes.find((item) => item.id === id)
     return node?.type !== 'output.viewport' && node?.type !== 'output.export'
   })
-  const lottieLayers = lottieAnalysis.counts.native + lottieAnalysis.counts.partial
+  const lottieExportable = Object.values(lottieAnalysis.nodes).some(
+    (nodeInfo) => nodeInfo.exportable,
+  )
 
   const setFormat = (next: OutputFormat) => {
     setSettings({ exportFormat: next })
@@ -128,6 +131,22 @@ export function ExportPanel() {
 
     const canvas = canvasRef.current
     if (!canvas) return
+
+    let destination
+    try {
+      destination = await pickExportDirectory()
+    } catch (error) {
+      setStatus({
+        kind: 'error',
+        message: (error as Error)?.message ?? 'Kunne ikke åpne lagringsdialogen.',
+        progress: 0,
+      })
+      return
+    }
+    if (destination.kind === 'cancelled') {
+      setStatus({ kind: 'idle', message: 'Eksport avbrutt.', progress: 0 })
+      return
+    }
 
     abortRef.current?.abort()
     const controller = new AbortController()
@@ -167,19 +186,34 @@ export function ExportPanel() {
           }),
       })
 
-      const url = URL.createObjectURL(result.blob)
       const audioNote = audioNode
         ? result.audioIncluded
           ? ' · med lyd'
           : ' · uten lyd'
         : ''
-      setStatus({
-        kind: 'done',
-        message: `Ferdig · ${result.duration.toFixed(2)} s · ${result.extension.toUpperCase()}${audioNote}`,
-        progress: 1,
-        url,
-        extension: result.extension,
-      })
+      const details = `${result.duration.toFixed(2)} s · ${result.extension.toUpperCase()}${audioNote}`
+      if (destination.kind === 'directory') {
+        const saved = await writeBlobToDirectory(
+          destination.handle,
+          `smudge-flow.${result.extension}`,
+          result.blob,
+        )
+        setStatus({
+          kind: 'done',
+          message: `Lagret ${saved} i ${destination.name} · ${details}`,
+          progress: 1,
+          extension: result.extension,
+        })
+      } else {
+        const url = URL.createObjectURL(result.blob)
+        setStatus({
+          kind: 'done',
+          message: `Ferdig · ${details}`,
+          progress: 1,
+          url,
+          extension: result.extension,
+        })
+      }
     } catch (error) {
       if ((error as Error)?.name === 'AbortError') {
         setStatus({ kind: 'idle', message: 'Eksport avbrutt.', progress: 0 })
@@ -193,20 +227,38 @@ export function ExportPanel() {
     abortRef.current?.abort()
   }
 
-  const downloadLottie = () => {
+  const downloadLottie = async () => {
+    let destination
+    try {
+      destination = await pickExportDirectory()
+    } catch (error) {
+      setLottieFailed(true)
+      setLottieMessage((error as Error)?.message ?? 'Kunne ikke åpne lagringsdialogen.')
+      return
+    }
+    if (destination.kind === 'cancelled') {
+      setLottieFailed(false)
+      setLottieMessage('Eksport avbrutt.')
+      return
+    }
+
     try {
       const result = exportLottie(graph, { targetId: target?.id ?? null })
       const blob = new Blob([result.json], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'smudge-flow.lottie.json'
-      a.click()
-      URL.revokeObjectURL(url)
-      setLottieFailed(false)
-      setLottieMessage(
-        `Eksporterte ${result.layers} lag${result.warnings.length > 0 ? ` · ${result.warnings.length} advarsler` : ''}.`,
-      )
+      const filename = 'smudge-flow.lottie.json'
+      const warningNote =
+        result.warnings.length > 0 ? ` · ${result.warnings.length} advarsler` : ''
+      if (destination.kind === 'directory') {
+        const saved = await writeBlobToDirectory(destination.handle, filename, blob)
+        setLottieFailed(false)
+        setLottieMessage(
+          `Lagret ${saved} i ${destination.name} · ${result.layers} lag${warningNote}.`,
+        )
+      } else {
+        downloadBlob(blob, filename)
+        setLottieFailed(false)
+        setLottieMessage(`Lastet ned ${filename} · ${result.layers} lag${warningNote}.`)
+      }
     } catch (error) {
       setLottieFailed(true)
       setLottieMessage((error as Error)?.message ?? 'Kunne ikke eksportere Lottie.')
@@ -377,10 +429,10 @@ export function ExportPanel() {
         <button
           type="button"
           onClick={downloadLottie}
-          disabled={lottieLayers === 0}
+          disabled={!lottieExportable}
           className="rounded-lg border border-lime-500/50 bg-lime-500/10 px-3 py-2 text-[12px] font-semibold text-lime-200 transition hover:bg-lime-500/20 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          ↓ Eksporter Lottie
+          ↓ Eksporter Lottie…
         </button>
         {lottieMessage && (
           <p
@@ -423,7 +475,7 @@ export function ExportPanel() {
           disabled={status.kind === 'running'}
           className="flex-1 rounded-lg bg-lime-400 px-3 py-2 text-[12px] font-semibold text-black transition hover:bg-lime-500 disabled:opacity-50"
         >
-          ↓ Eksporter video
+          ↓ Eksporter video…
         </button>
         {status.kind === 'running' && (
           <button
@@ -469,6 +521,11 @@ export function ExportPanel() {
       )}
 
       <canvas ref={canvasRef} className="hidden" />
+
+      <p className="text-[10px] leading-relaxed text-zinc-600">
+        Du velger lagringsmappe i en Finder-dialog før eksporten starter. Nettlesere uten
+        File System Access API laster ned filen som før.
+      </p>
 
       <p className="text-[10px] leading-relaxed text-zinc-600">
         Eksporten kjører SAMME evalueringsmotor som forhåndsvisningen, én frame om gangen,

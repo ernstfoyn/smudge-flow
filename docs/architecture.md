@@ -267,6 +267,12 @@ kombineres med keyframes og LFO-er uten å overskrive noe.
 Begge bruker `ctx.phase` og et heltall antall sykluser per loop. Derfor er
 verdien ved fase 1 identisk med fase 0. `motion3D` har også en startfase og en
 faseforskyvning per objekt. Når inngangen er en gruppe — for eksempel fra
+`modifier.scatter2D` er 2D-motstykket: den sampler kloneposisjoner og
+per-klone-transform med `scatter2DPoint()`/`scatter2DInstance()`, og bruker
+alfagrensen til inngangen som pivot. Lottie-eksporten kloner de ferdige
+Lottie-lagene og legger på en egen null-parent per klone, slik at layout og
+bevegelse blir separate lag.
+
 `modifier.scatter3D` — får hvert toppnivå-barn sin egen bevegelse. Da virker
 spiral/sverm og faseforskyvningen per kopi, som i den gamle cloneren.
 
@@ -632,6 +638,10 @@ senere flyttes til en egen pakke.
 ---
 
 ## 10. Eksport
+
+`src/export/saveFile.ts` bruker File System Access API til å la brukeren velge
+lagringsmappe før eksporten. Video og Lottie skrives med automatisk filnavn, og
+får et suffiks hvis navnet finnes. Safari/Firefox faller tilbake til nedlasting.
 
 `src/export/lottie/` lager en Lottie JSON for den delen av grafen som kan
 uttrykkes som vektorer. `compat.ts` analyserer grafen og merker hver node som

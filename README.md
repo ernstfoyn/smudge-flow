@@ -88,6 +88,7 @@ Port-status: [`docs/legacy-parity.md`](docs/legacy-parity.md)
 | `source.blob3D` | kilde | Smudge `blob.glsl.js` — raymarchet metaball-form |
 | `source.obj` | kilde | Orbit `obj-import.js` — importerte 3D-modeller |
 | `modifier.transform2D` | modifikator | Ny, erstatter Smudges 3D-transform |
+| `modifier.scatter2D` | modifikator | Orbit-cloneren — line, ring, grid, disk og spiral med per-klone bevegelse |
 | `modifier.transform3D` | modifikator | Ny — flytter/roterer 3D-objekter |
 | `modifier.trail` | modifikator | Smudge `trailTexture.js` — malte stempler, lagret som data |
 | `modifier.smudgeDeform` | modifikator | Smudge `vertex/fragment.glsl.js` — flytende glass, trail, glans |
@@ -254,6 +255,22 @@ samlet. De følger grafens oppløsning og kan blandes med bilder i en Lagstabel.
 Slå på **Gradientfyll** for å fylle tekst eller fasong med en flerfarge-gradient
 i stedet for en flat farge.
 
+### 2D-kloner
+
+`modifier.scatter2D` er den gamle cloneren fra Orbit, men med friere bevegelse.
+Den kopierer et 2D-lag i **linje**, **ring**, **grid**, **skive** eller
+**spiral**. Du kan styre antall, avstand, radius, kolonner, rotasjonsspredning,
+størrelsesvariasjon og en felles dekkevne.
+
+Hver klone kan få egen fase og bevege seg med **flyt**, **drift**, **bane**,
+**puls**, **vugging** eller **fade**. Bevegelsen bruker hele sykluser per loop,
+så frame 0 og frame N matcher. Klonene arver hele 2D-laget, inkludert former,
+tekst, gradienter og eventuelle effekter.
+
+Lottie-eksporten utvider klonene til separate Lottie-lag når inngangen er en
+form, tekst eller gradient. Rotasjon og skala bruker lerretets midtpunkt i
+Lottie; hold objektet sentrert for helt likt resultat.
+
 ### Masker og matte
 
 Masker bruker alfa: hvitt er synlig og gjennomsiktig er skjult. Da virker
@@ -394,6 +411,12 @@ oppløsningen ikke krymper hver gang du veksler mellom landskap og portrett.
 Valgene lagres sammen med grafen. Hvis grafen har en `output.export`-node,
 følger filformatet den nodens innstilling; ellers brukes prosjektinnstillingen.
 
+Ved eksport åpnes en Finder-dialog der du velger lagringsmappe. Filnavnet
+settes automatisk (`smudge-flow.mp4`, `smudge-flow.webm` eller
+`smudge-flow.lottie.json`), og får `-2`, `-3` osv. hvis det finnes fra før.
+Dette bruker File System Access API i Chromium-nettlesere. Safari og Firefox
+faller tilbake til vanlig nedlasting.
+
 ### Lottie (JSON)
 
 Eksport-panelet kan også lage en **Lottie JSON**. Den inneholder ekte
@@ -402,6 +425,7 @@ vektorlag for:
 - 2D-fasong med solid eller gradientfyll, kant, transform og opacity
 - 2D-tekst uten gradient
 - Gradientkilden som bakgrunn
+- 2D-kloner som separate Lottie-lag
 - Transform 2D, Lagstabel og Blanding
 - Keyframes på posisjon, rotasjon, skala, opacity og størrelse der Lottie
   har en tilsvarende egenskap
@@ -409,7 +433,10 @@ vektorlag for:
 3D, shaders, støy, Celler, Fragmentprisme og rastereffekter har ingen direkte
 Lottie-ekvivalent og hoppes over med en advarsel. Slå på **Vis kompatibilitet**
 for å se grønn (native), gul (med forbehold) og rød (hoppes over) status på
-nodene. Keyframe-easing utover lineær og hold forenkles til lineær i v1.
+nodene. En støttet node kan bli gul eller rød fordi inngangen foran ikke kan
+eksporteres: Transform 2D er støttet, men en shader-effekt som Riflert glass
+foran gjør at hele grenen hoppes over. Deaktiver effekten eller lag en egen
+Lottie-gren. Keyframe-easing utover lineær og hold forenkles til lineær i v1.
 Rive (.riv) er ikke støttet.
 
 ---
